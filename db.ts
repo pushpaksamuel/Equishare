@@ -1,7 +1,6 @@
-
-
-// FIX: Dexie is a default export, so it must be imported without curly braces to fix method resolution errors.
-import Dexie, { type Table } from 'dexie';
+// FIX: Changed to separate default and type imports for Dexie to resolve method resolution errors.
+import Dexie from 'dexie';
+import type { Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 

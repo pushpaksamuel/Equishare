@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../hooks/useData';
 import { db } from '../db';
@@ -7,7 +8,7 @@ import { formatCurrency } from '../utils/formatters';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
-import { EditIcon, Trash2Icon, MoreVerticalIcon, ReceiptIcon, ChevronDownIcon } from '../components/common/Icons';
+import { EditIcon, Trash2Icon, MoreVerticalIcon, ReceiptIcon, ChevronDownIcon, FilterIcon, XIcon } from '../components/common/Icons';
 import type { ExpenseWithDetails } from '../types';
 
 const isEqualSplit = (expense: ExpenseWithDetails) => {
@@ -17,21 +18,27 @@ const isEqualSplit = (expense: ExpenseWithDetails) => {
 };
 
 
-const ExpenseList = ({ expenses, currencyCode }: { expenses: ExpenseWithDetails[], currencyCode: string }) => {
+const ExpenseList = ({ expenses, currencyCode, isFiltered }: { expenses: ExpenseWithDetails[], currencyCode: string, isFiltered: boolean }) => {
     const [openMenuId, setOpenMenuId] = useState<number | null>(null);
     const [visibleCount, setVisibleCount] = useState(10);
     const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
     const [expenseToDelete, setExpenseToDelete] = useState<number | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const handleClickOutside = () => setOpenMenuId(null);
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setOpenMenuId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     const handleDeleteExpense = (expenseId: number) => {
         setExpenseToDelete(expenseId);
         setDeleteModalOpen(true);
+        setOpenMenuId(null);
     };
 
     const confirmDeleteExpense = async () => {
@@ -53,11 +60,13 @@ const ExpenseList = ({ expenses, currencyCode }: { expenses: ExpenseWithDetails[
     if (expenses.length === 0) {
         return (
             <div className="text-center py-16">
-              <h3 className="text-xl font-medium">No expenses here!</h3>
-              <p className="text-slate-500 dark:text-slate-400 mt-2">Add a new expense to get started.</p>
-              <Button as={Link} to="/expenses/add" className="mt-6">
-                Add Expense
-              </Button>
+              <h3 className="text-xl font-medium">{isFiltered ? "No Expenses Match Filters" : "No expenses here!"}</h3>
+              <p className="text-slate-500 dark:text-slate-400 mt-2">{isFiltered ? "Try adjusting or clearing your filters to see more." : "Add a new expense to get started."}</p>
+              {!isFiltered && (
+                <Button as={Link} to="/expenses/add" className="mt-6">
+                  Add Expense
+                </Button>
+              )}
             </div>
         );
     }
@@ -81,16 +90,13 @@ const ExpenseList = ({ expenses, currencyCode }: { expenses: ExpenseWithDetails[
 
                     <div className="flex items-center gap-4 ml-4">
                         <p className="font-semibold text-lg text-right hidden sm:block">{formatCurrency(expense.amount, currencyCode)}</p>
-                        <div className="relative">
-                           <Button size="icon" variant="secondary" onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuId(openMenuId === expense.id ? null : expense.id);
-                           }}>
+                        <div className="relative" ref={menuRef}>
+                           <Button size="icon" variant="secondary" onClick={() => setOpenMenuId(openMenuId === expense.id ? null : expense.id)}>
                                 <MoreVerticalIcon className="w-5 h-5" />
                             </Button>
                             {openMenuId === expense.id && (
                                 <div className="absolute right-0 mt-2 w-40 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 animate-fade-in" style={{ animationDuration: '150ms'}}>
-                                    <Link to={`/expenses/edit/${expense.id}`} className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-t-md">
+                                    <Link to={`/expenses/edit/${expense.id}`} onClick={() => setOpenMenuId(null)} className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-t-md">
                                         <EditIcon className="w-4 h-4"/> Edit
                                     </Link>
                                     <button onClick={() => handleDeleteExpense(expense.id!)} className="flex items-center gap-3 w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-b-md">
@@ -123,34 +129,158 @@ const ExpenseList = ({ expenses, currencyCode }: { expenses: ExpenseWithDetails[
     );
 }
 
+const formatMonthKey = (monthKey: string) => {
+    const [year, month] = monthKey.split('-');
+    const date = new Date(Number(year), Number(month) - 1);
+    return date.toLocaleString('default', { month: 'long', year: 'numeric' });
+};
+
 const ExpensesPage: React.FC = () => {
     const { 
         groupExpenses,
         familyExpenses,
         individualExpenses,
+        categories,
         currencyCode, 
         loading 
     } = useData();
     const [activeTab, setActiveTab] = useState<'group' | 'family' | 'individual'>('group');
+    const [selectedCategories, setSelectedCategories] = useState<Set<number>>(new Set());
+    const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+    const [isCategoryFilterOpen, setCategoryFilterOpen] = useState(false);
+    const [isMonthFilterOpen, setMonthFilterOpen] = useState(false);
+    const categoryFilterRef = useRef<HTMLDivElement>(null);
+    const monthFilterRef = useRef<HTMLDivElement>(null);
     
-    if (loading) return <div>Loading...</div>;
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (categoryFilterRef.current && !categoryFilterRef.current.contains(event.target as Node)) {
+                setCategoryFilterOpen(false);
+            }
+            if (monthFilterRef.current && !monthFilterRef.current.contains(event.target as Node)) {
+                setMonthFilterOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const expensesByTab = {
         group: groupExpenses,
         family: familyExpenses,
         individual: individualExpenses,
     };
+    const currentExpenses = expensesByTab[activeTab];
+
+    const availableMonths = useMemo(() => {
+        const months = new Set<string>();
+        currentExpenses.forEach(expense => {
+            const date = new Date(expense.date);
+            const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            months.add(monthKey);
+        });
+        return Array.from(months).sort((a,b) => b.localeCompare(a));
+    }, [currentExpenses]);
+    
+    const filteredExpenses = useMemo(() => {
+        return currentExpenses.filter(expense => {
+            const categoryMatch = selectedCategories.size === 0 || selectedCategories.has(expense.categoryId);
+            const monthMatch = !selectedMonth || (() => {
+                const expenseDate = new Date(expense.date);
+                const expenseMonthKey = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
+                return expenseMonthKey === selectedMonth;
+            })();
+            return categoryMatch && monthMatch;
+        });
+    }, [currentExpenses, selectedCategories, selectedMonth]);
+
+    const handleCategoryToggle = (categoryId: number) => {
+        setSelectedCategories(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(categoryId)) newSet.delete(categoryId);
+            else newSet.add(categoryId);
+            return newSet;
+        });
+    };
+    
+    const handleMonthSelect = (monthKey: string | null) => {
+        setSelectedMonth(monthKey);
+        setMonthFilterOpen(false);
+    };
+
+    const clearFilters = () => {
+        setSelectedCategories(new Set());
+        setSelectedMonth(null);
+    };
+
+    const isFiltered = selectedCategories.size > 0 || !!selectedMonth;
+
+    if (loading) return <div>Loading...</div>;
 
     const tabButtonClasses = "px-4 py-2 text-sm font-medium rounded-md transition-colors flex-1";
     const activeTabClasses = "bg-primary-600 text-white shadow";
     const inactiveTabClasses = "text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700";
+    const getCategoryName = (id: number) => categories.find(c => c.id === id)?.name || 'Unknown';
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap gap-4 justify-between items-center">
                 <h1 className="text-3xl font-bold">All Expenses</h1>
-                <Button as={Link} to="/expenses/add">Add Expense</Button>
+                <div className="flex gap-2 items-center">
+                    <div className="relative" ref={categoryFilterRef}>
+                        <Button variant="outline" onClick={() => setCategoryFilterOpen(o => !o)}>
+                            <FilterIcon className="w-4 h-4 mr-2"/> Category
+                        </Button>
+                        {isCategoryFilterOpen && (
+                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 p-2 max-h-60 overflow-y-auto">
+                               {categories.map(cat => (
+                                   <label key={cat.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+                                       <input type="checkbox" checked={selectedCategories.has(cat.id!)} onChange={() => handleCategoryToggle(cat.id!)} className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                                       <span className="text-sm text-slate-700 dark:text-slate-200">{cat.name}</span>
+                                   </label>
+                               ))}
+                            </div>
+                        )}
+                    </div>
+                     <div className="relative" ref={monthFilterRef}>
+                        <Button variant="outline" onClick={() => setMonthFilterOpen(o => !o)}>
+                           <FilterIcon className="w-4 h-4 mr-2"/> Month
+                        </Button>
+                        {isMonthFilterOpen && (
+                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 max-h-60 overflow-y-auto">
+                                <button onClick={() => handleMonthSelect(null)} className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 font-medium">All Months</button>
+                                {availableMonths.map(month => (
+                                    <button key={month} onClick={() => handleMonthSelect(month)} className={`w-full text-left px-4 py-2 text-sm ${selectedMonth === month ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                                       {formatMonthKey(month)}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <Button as={Link} to="/expenses/add">Add Expense</Button>
+                </div>
             </div>
+
+            {isFiltered && (
+                <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg">
+                    <span className="text-sm font-medium">Active Filters:</span>
+                    {selectedMonth && (
+                         <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-700 rounded-full">
+                            {formatMonthKey(selectedMonth)}
+                            <button onClick={() => setSelectedMonth(null)}><XIcon className="w-3 h-3"/></button>
+                        </span>
+                    )}
+                    {/* FIX: Explicitly type `catId` as `number` to resolve TypeScript inference issue. */}
+                    {Array.from(selectedCategories).map((catId: number) => (
+                        <span key={catId} className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-700 rounded-full">
+                            {getCategoryName(catId)}
+                            <button onClick={() => handleCategoryToggle(catId)}><XIcon className="w-3 h-3"/></button>
+                        </span>
+                    ))}
+                    <Button variant="secondary" size="sm" onClick={clearFilters} className="!py-0.5 !px-2 !text-xs ml-auto">Clear All</Button>
+                </div>
+            )}
+
 
             <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1">
                 <button className={`${tabButtonClasses} ${activeTab === 'group' ? activeTabClasses : inactiveTabClasses}`} onClick={() => setActiveTab('group')}>Group</button>
@@ -159,7 +289,7 @@ const ExpensesPage: React.FC = () => {
             </div>
       
             <Card className="!p-0">
-                <ExpenseList expenses={expensesByTab[activeTab]} currencyCode={currencyCode} />
+                <ExpenseList expenses={filteredExpenses} currencyCode={currencyCode} isFiltered={isFiltered} />
             </Card>
         </div>
     );
