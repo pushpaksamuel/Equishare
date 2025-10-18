@@ -1,3 +1,4 @@
+// FIX: Restored correct file content.
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
@@ -97,7 +98,6 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-fade-in">
-       <h1 className="text-3xl font-bold">Settings</h1>
       
       <section>
         <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">User Information</h2>

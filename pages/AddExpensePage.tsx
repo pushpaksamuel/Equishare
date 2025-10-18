@@ -1,3 +1,4 @@
+// FIX: Restored correct file content.
 import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
@@ -104,7 +105,6 @@ const AddExpensePage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in">
-      <h1 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Add New Expense</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         
         <Card>

@@ -257,62 +257,59 @@ const ExpensesPage: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-fade-in">
-            <div className="flex flex-wrap gap-4 justify-between items-center">
-                <h1 className="text-3xl font-bold">All Expenses</h1>
-                <div className="flex gap-2 items-center">
-                    <div className="relative" ref={categoryFilterRef}>
-                        <Button variant="outline" onClick={() => setCategoryFilterOpen(o => !o)}>
-                            <FilterIcon className="w-4 h-4 mr-2"/> Category
-                        </Button>
-                        {isCategoryFilterOpen && (
-                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 p-2 max-h-60 overflow-y-auto">
-                               {categories.map(cat => (
-                                   <label key={cat.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
-                                       <input type="checkbox" checked={selectedCategories.has(cat.id!)} onChange={() => handleCategoryToggle(cat.id!)} className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-                                       <span className="text-sm text-slate-700 dark:text-slate-200">{cat.name}</span>
-                                   </label>
-                               ))}
-                            </div>
-                        )}
-                    </div>
-                     <div className="relative" ref={monthFilterRef}>
-                        <Button variant="outline" onClick={() => setMonthFilterOpen(o => !o)}>
-                           <FilterIcon className="w-4 h-4 mr-2"/> Month
-                        </Button>
-                        {isMonthFilterOpen && (
-                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 max-h-60 overflow-y-auto">
-                                <button
-                                    onClick={() => handleMonthSelect(null)}
-                                    className={`w-full text-left px-4 py-2 text-sm font-medium ${
-                                        selectedMonth === null
-                                        ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200'
-                                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                    }`}
-                                >
-                                    All Months
-                                </button>
-                                {availableMonths.map(month => (
-                                    <button key={month} onClick={() => handleMonthSelect(month)} className={`w-full text-left px-4 py-2 text-sm ${selectedMonth === month ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
-                                       {formatMonthKey(month)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <div className="relative" ref={sortFilterRef}>
-                        <Button variant="outline" onClick={() => setSortFilterOpen(o => !o)}>
-                            <ArrowUpDownIcon className="w-4 h-4 mr-2"/> Sort
-                        </Button>
-                        {isSortFilterOpen && (
-                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
-                                <button onClick={() => handleSortSelect('date-desc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'date-desc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Date (Newest first)</button>
-                                <button onClick={() => handleSortSelect('amount-desc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'amount-desc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Amount (High to low)</button>
-                                <button onClick={() => handleSortSelect('amount-asc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'amount-asc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Amount (Low to high)</button>
-                            </div>
-                        )}
-                    </div>
-                    <Button as={Link} to="/expenses/add">Add Expense</Button>
+            <div className="flex flex-wrap gap-2 justify-end items-center">
+                <div className="relative" ref={categoryFilterRef}>
+                    <Button variant="outline" onClick={() => setCategoryFilterOpen(o => !o)}>
+                        <FilterIcon className="w-4 h-4 mr-2"/> Category
+                    </Button>
+                    {isCategoryFilterOpen && (
+                        <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 p-2 max-h-60 overflow-y-auto">
+                           {categories.map(cat => (
+                               <label key={cat.id} className="flex items-center gap-2 p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer">
+                                   <input type="checkbox" checked={selectedCategories.has(cat.id!)} onChange={() => handleCategoryToggle(cat.id!)} className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                                   <span className="text-sm text-slate-700 dark:text-slate-200">{cat.name}</span>
+                               </label>
+                           ))}
+                        </div>
+                    )}
                 </div>
+                 <div className="relative" ref={monthFilterRef}>
+                    <Button variant="outline" onClick={() => setMonthFilterOpen(o => !o)}>
+                       <FilterIcon className="w-4 h-4 mr-2"/> Month
+                    </Button>
+                    {isMonthFilterOpen && (
+                         <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10 max-h-60 overflow-y-auto">
+                            <button
+                                onClick={() => handleMonthSelect(null)}
+                                className={`w-full text-left px-4 py-2 text-sm font-medium ${
+                                    selectedMonth === null
+                                    ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200'
+                                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                }`}
+                            >
+                                All Months
+                            </button>
+                            {availableMonths.map(month => (
+                                <button key={month} onClick={() => handleMonthSelect(month)} className={`w-full text-left px-4 py-2 text-sm ${selectedMonth === month ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                                   {formatMonthKey(month)}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                <div className="relative" ref={sortFilterRef}>
+                    <Button variant="outline" onClick={() => setSortFilterOpen(o => !o)}>
+                        <ArrowUpDownIcon className="w-4 h-4 mr-2"/> Sort
+                    </Button>
+                    {isSortFilterOpen && (
+                         <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
+                            <button onClick={() => handleSortSelect('date-desc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'date-desc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Date (Newest first)</button>
+                            <button onClick={() => handleSortSelect('amount-desc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'amount-desc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Amount (High to low)</button>
+                            <button onClick={() => handleSortSelect('amount-asc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'amount-asc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Amount (Low to high)</button>
+                        </div>
+                    )}
+                </div>
+                <Button as={Link} to="/expenses/add">Add Expense</Button>
             </div>
 
             {isFiltered && (

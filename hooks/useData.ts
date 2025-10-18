@@ -1,3 +1,4 @@
+// FIX: Restored correct file content.
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { CURRENCIES } from '../constants';
@@ -11,7 +12,7 @@ export function useData() {
   const allGroups = useLiveQuery(() => db.groups.toArray(), []) as Group[] | undefined;
   const allMembersQuery = useLiveQuery(() => db.members.toArray(), []) as Member[] | undefined;
   const categories = useLiveQuery(() => db.categories.toArray(), []) as Category[] | undefined;
-  const allExpenses = useLiveQuery(() => db.expenses.reverse().sortBy('date'), []) as Expense[] | undefined;
+  const allExpenses = useLiveQuery(() => db.expenses.orderBy('date').reverse().toArray(), []) as Expense[] | undefined;
   const allAllocations = useLiveQuery(
     () => (allExpenses ? db.allocations.where('expenseId').anyOf(allExpenses.map(e => e.id!)).toArray() : []),
     [allExpenses]

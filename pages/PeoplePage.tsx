@@ -1,3 +1,4 @@
+// FIX: Restored correct file content.
 import React, { useState } from 'react';
 import { useData } from '../hooks/useData';
 import { db } from '../db';
@@ -113,8 +114,7 @@ const PeoplePage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">People</h1>
+      <div className="flex justify-end items-center">
         <Button onClick={() => setAddModalOpen(true)}>Add Member</Button>
       </div>
 

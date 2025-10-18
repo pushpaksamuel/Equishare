@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: '/Equishare/', // 👈 ADD THIS LINE (important for GitHub Pages)
+    base: '/EquiShare/', // 👈 ADD THIS LINE (important for GitHub Pages)
     server: {
       port: 3000,
       host: '0.0.0.0',

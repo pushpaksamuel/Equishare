@@ -100,8 +100,7 @@ const GroupsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Groups</h1>
+      <div className="flex justify-end items-center">
         <Button onClick={openAddModal}>
           <PlusIcon className="w-5 h-5 mr-2" />
           Add Group

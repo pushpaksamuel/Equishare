@@ -1,3 +1,4 @@
+// FIX: Restored correct file content.
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../hooks/useData';
@@ -75,10 +76,10 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <header className="flex justify-between items-center">
+      <div className="flex justify-between items-center">
         <div>
             <button className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{group?.name}</h1>
+                <span className="text-2xl font-bold text-slate-800 dark:text-slate-100">{group?.name}</span>
                 <ChevronDownIcon className="w-5 h-5 text-slate-500" />
             </button>
         </div>
@@ -87,12 +88,8 @@ const DashboardPage: React.FC = () => {
                 <PlusCircleIcon className="w-5 h-5 mr-2" />
                 Add Expense
             </Button>
-            <div className="flex items-center gap-2">
-                <Avatar name={user?.name || ''} className="w-9 h-9 border-2 border-white dark:border-slate-700" />
-                <span className="font-medium hidden sm:block">{user?.name}</span>
-            </div>
         </div>
-      </header>
+      </div>
       
       {/* Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

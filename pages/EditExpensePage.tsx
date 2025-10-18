@@ -1,3 +1,4 @@
+// FIX: Restored correct file content.
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -131,7 +132,6 @@ const EditExpensePage: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto animate-fade-in">
-      <h1 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Edit Expense</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
         
         <Card>

@@ -83,7 +83,6 @@ const AnalyticsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <h1 className="text-3xl font-bold">Analytics</h1>
       
       <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1">
         <button className={`${tabButtonClasses} ${activeTab === 'group' ? activeTabClasses : inactiveTabClasses}`} onClick={() => setActiveTab('group')}>Group</button>
