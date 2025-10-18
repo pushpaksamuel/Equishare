@@ -8,7 +8,7 @@ import { formatCurrency } from '../utils/formatters';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Modal from '../components/common/Modal';
-import { EditIcon, Trash2Icon, MoreVerticalIcon, ReceiptIcon, ChevronDownIcon, FilterIcon, XIcon } from '../components/common/Icons';
+import { EditIcon, Trash2Icon, MoreVerticalIcon, ReceiptIcon, ChevronDownIcon, FilterIcon, XIcon, ArrowUpDownIcon } from '../components/common/Icons';
 import type { ExpenseWithDetails } from '../types';
 
 const isEqualSplit = (expense: ExpenseWithDetails) => {
@@ -135,6 +135,8 @@ const formatMonthKey = (monthKey: string) => {
     return date.toLocaleString('default', { month: 'long', year: 'numeric' });
 };
 
+type SortOrder = 'date-desc' | 'amount-desc' | 'amount-asc';
+
 const ExpensesPage: React.FC = () => {
     const { 
         groupExpenses,
@@ -147,10 +149,15 @@ const ExpensesPage: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'group' | 'family' | 'individual'>('group');
     const [selectedCategories, setSelectedCategories] = useState<Set<number>>(new Set());
     const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+    const [sortOrder, setSortOrder] = useState<SortOrder>('date-desc');
+
     const [isCategoryFilterOpen, setCategoryFilterOpen] = useState(false);
     const [isMonthFilterOpen, setMonthFilterOpen] = useState(false);
+    const [isSortFilterOpen, setSortFilterOpen] = useState(false);
+
     const categoryFilterRef = useRef<HTMLDivElement>(null);
     const monthFilterRef = useRef<HTMLDivElement>(null);
+    const sortFilterRef = useRef<HTMLDivElement>(null);
     
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -159,6 +166,9 @@ const ExpensesPage: React.FC = () => {
             }
             if (monthFilterRef.current && !monthFilterRef.current.contains(event.target as Node)) {
                 setMonthFilterOpen(false);
+            }
+            if (sortFilterRef.current && !sortFilterRef.current.contains(event.target as Node)) {
+                setSortFilterOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -183,7 +193,7 @@ const ExpensesPage: React.FC = () => {
     }, [currentExpenses]);
     
     const filteredExpenses = useMemo(() => {
-        return currentExpenses.filter(expense => {
+        const filtered = currentExpenses.filter(expense => {
             const categoryMatch = selectedCategories.size === 0 || selectedCategories.has(expense.categoryId);
             const monthMatch = !selectedMonth || (() => {
                 const expenseDate = new Date(expense.date);
@@ -192,7 +202,19 @@ const ExpensesPage: React.FC = () => {
             })();
             return categoryMatch && monthMatch;
         });
-    }, [currentExpenses, selectedCategories, selectedMonth]);
+
+        return filtered.sort((a, b) => {
+            switch (sortOrder) {
+                case 'amount-desc':
+                    return b.amount - a.amount;
+                case 'amount-asc':
+                    return a.amount - b.amount;
+                case 'date-desc':
+                default:
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+            }
+        });
+    }, [currentExpenses, selectedCategories, selectedMonth, sortOrder]);
 
     const handleCategoryToggle = (categoryId: number) => {
         setSelectedCategories(prev => {
@@ -207,6 +229,11 @@ const ExpensesPage: React.FC = () => {
         setSelectedMonth(monthKey);
         setMonthFilterOpen(false);
     };
+    
+    const handleSortSelect = (order: SortOrder) => {
+        setSortOrder(order);
+        setSortFilterOpen(false);
+    };
 
     const clearFilters = () => {
         setSelectedCategories(new Set());
@@ -214,6 +241,12 @@ const ExpensesPage: React.FC = () => {
     };
 
     const isFiltered = selectedCategories.size > 0 || !!selectedMonth;
+    const sortLabels: Record<SortOrder, string> = {
+        'date-desc': 'Date (Newest)',
+        'amount-desc': 'Amount (High-Low)',
+        'amount-asc': 'Amount (Low-High)',
+    };
+
 
     if (loading) return <div>Loading...</div>;
 
@@ -263,6 +296,18 @@ const ExpensesPage: React.FC = () => {
                                        {formatMonthKey(month)}
                                     </button>
                                 ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="relative" ref={sortFilterRef}>
+                        <Button variant="outline" onClick={() => setSortFilterOpen(o => !o)}>
+                            <ArrowUpDownIcon className="w-4 h-4 mr-2"/> Sort
+                        </Button>
+                        {isSortFilterOpen && (
+                             <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
+                                <button onClick={() => handleSortSelect('date-desc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'date-desc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Date (Newest first)</button>
+                                <button onClick={() => handleSortSelect('amount-desc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'amount-desc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Amount (High to low)</button>
+                                <button onClick={() => handleSortSelect('amount-asc')} className={`w-full text-left px-4 py-2 text-sm ${sortOrder === 'amount-asc' ? 'bg-primary-100 dark:bg-primary-900/50 text-primary-700 dark:text-primary-200' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>Amount (Low to high)</button>
                             </div>
                         )}
                     </div>
