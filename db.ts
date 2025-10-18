@@ -1,4 +1,6 @@
-// FIX: Changed Dexie import to the standard format `import Dexie, { type Table } from 'dexie';` to correctly resolve the Dexie class and its methods, fixing compilation errors across the application.
+
+
+// FIX: Dexie is a default export, so it must be imported without curly braces to fix method resolution errors.
 import Dexie, { type Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
@@ -40,6 +42,17 @@ export class AppDatabase extends Dexie {
     // Version 3 adds password to users table
     this.version(3).stores({
       groups: '++id, name',
+      members: '++id, groupId, name',
+      categories: '++id, name',
+      expenses: '++id, groupId, date, categoryId, payerMemberId',
+      allocations: '++id, expenseId, memberId',
+      settings: 'id',
+      users: '++id, name, email, password',
+    });
+
+    // Version 4 adds type to groups table
+    this.version(4).stores({
+      groups: '++id, name, type',
       members: '++id, groupId, name',
       categories: '++id, name',
       expenses: '++id, groupId, date, categoryId, payerMemberId',

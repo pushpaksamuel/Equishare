@@ -3,6 +3,7 @@ export interface Group {
   id?: number;
   name: string;
   currency: string;
+  type: 'individual' | 'family' | 'group';
 }
 
 export interface Member {

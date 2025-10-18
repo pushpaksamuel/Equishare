@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
@@ -96,7 +97,7 @@ const OnboardingPage: React.FC = () => {
         await db.users.add({ name: userName.trim(), email: userEmail.trim(), contactInfo: `${countryCode}${userContact.trim()}`, password });
         
         // Create Group
-        const groupId = await db.groups.add({ name: finalGroupName, currency });
+        const groupId = await db.groups.add({ name: finalGroupName, currency, type: usageType! });
         
         // Add Members
         const membersToAdd = finalMembers.map(name => ({ groupId, name }));

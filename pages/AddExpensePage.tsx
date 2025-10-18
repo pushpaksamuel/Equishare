@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
@@ -5,6 +6,7 @@ import { useData } from '../hooks/useData';
 import { useExpenseSplit } from '../hooks/useExpenseSplit';
 import { formatDate } from '../utils/formatters';
 import { resizeAndEncodeImage } from '../services/imageService';
+import { CURRENCIES } from '../constants';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -14,7 +16,9 @@ import { ImageIcon, Trash2Icon } from '../components/common/Icons';
 
 const AddExpensePage: React.FC = () => {
   const navigate = useNavigate();
-  const { group, groupMembers, categories, currencySymbol, loading } = useData();
+  const { allGroups, allMembers, categories, loading } = useData();
+  
+  const [selectedGroupId, setSelectedGroupId] = useState<number | ''>('');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(formatDate(new Date()));
@@ -22,6 +26,13 @@ const AddExpensePage: React.FC = () => {
   const [payerId, setPayerId] = useState<number | ''>('');
   const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedGroup = useMemo(() => allGroups.find(g => g.id === selectedGroupId), [allGroups, selectedGroupId]);
+  const membersOfSelectedGroup = useMemo(() => allMembers.filter(m => m.groupId === selectedGroupId), [allMembers, selectedGroupId]);
+  const currencySymbol = useMemo(() => {
+      if (!selectedGroup) return '$';
+      return CURRENCIES.find(c => c.code === selectedGroup.currency)?.symbol || '$';
+  }, [selectedGroup]);
 
   const totalAmount = parseFloat(amount) || 0;
   const {
@@ -34,7 +45,7 @@ const AddExpensePage: React.FC = () => {
     remainingAmount,
     isValid,
     finalAllocations
-  } = useExpenseSplit(totalAmount, groupMembers);
+  } = useExpenseSplit(totalAmount, membersOfSelectedGroup);
   
   const sortedCategories = useMemo(() => [...categories].sort((a,b) => a.name.localeCompare(b.name)), [categories]);
   
@@ -53,7 +64,7 @@ const AddExpensePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!group || !isValid || !payerId || !categoryId || !description.trim()) {
+    if (!selectedGroup || !isValid || !payerId || !categoryId || !description.trim()) {
       alert('Please fill out all required fields and ensure the split is correct.');
       return;
     }
@@ -61,7 +72,7 @@ const AddExpensePage: React.FC = () => {
     try {
       await db.transaction('rw', db.expenses, db.allocations, async () => {
         const expenseId = await db.expenses.add({
-          groupId: group.id!,
+          groupId: selectedGroup.id!,
           description,
           amount: totalAmount,
           date: new Date(date),
@@ -84,7 +95,7 @@ const AddExpensePage: React.FC = () => {
   };
 
   if (loading) return <div>Loading...</div>;
-  if (!group || groupMembers.length === 0) return <div>Group or members not found. Please set up your group first.</div>;
+  if (allGroups.length === 0) return <div>No groups found. Please create a group first in Settings.</div>;
   
   const remainingAmountIsZero = Math.abs(remainingAmount) < 0.01;
 
@@ -95,6 +106,13 @@ const AddExpensePage: React.FC = () => {
         
         <Card>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label htmlFor="group" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Group</label>
+              <Select id="group" value={selectedGroupId} onChange={e => { setSelectedGroupId(Number(e.target.value)); setPayerId(''); }} required>
+                <option value="" disabled>Select a group</option>
+                {allGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </Select>
+            </div>
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
               <Input id="description" value={description} onChange={e => setDescription(e.target.value)} required placeholder="e.g., Dinner with friends" />
@@ -116,59 +134,61 @@ const AddExpensePage: React.FC = () => {
             </div>
             <div className="col-span-1 md:col-span-2">
               <label htmlFor="payer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Paid by</label>
-              <Select id="payer" value={payerId} onChange={e => setPayerId(Number(e.target.value))} required>
+              <Select id="payer" value={payerId} onChange={e => setPayerId(Number(e.target.value))} required disabled={!selectedGroupId}>
                 <option value="" disabled>Select who paid</option>
-                {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {membersOfSelectedGroup.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </Select>
             </div>
           </div>
         </Card>
 
-        <Card>
-            <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Split Details</h2>
-            <div className="flex items-center gap-2 mb-6 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg w-48">
-                <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'equally' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('equally')}>Equally</button>
-                <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-primary-600 text-white shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
-            </div>
+        {selectedGroupId && membersOfSelectedGroup.length > 0 && (
+          <Card>
+              <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Split Details</h2>
+              <div className="flex items-center gap-2 mb-6 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg w-48">
+                  <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'equally' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('equally')}>Equally</button>
+                  <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-primary-600 text-white shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
+              </div>
 
-            <ul className="space-y-3">
-                {groupMembers.map(member => {
-                    const isChecked = involvedMembers.has(member.id!);
-                    const allocation = allocations.find(a => a.memberId === member.id);
-                    const memberShare = isChecked && splitMethod === 'equally' ? (totalAmount / involvedMembers.size) || 0 : 0;
-                    
-                    return (
-                        <li key={member.id} className="flex items-center gap-4 p-2 rounded-lg">
-                            <input type="checkbox" checked={isChecked} onChange={() => toggleMemberInvolvement(member.id!)} className="h-5 w-5 rounded border-slate-400 dark:border-slate-500 text-primary-600 focus:ring-primary-500 bg-transparent dark:bg-slate-700 checked:bg-primary-600" />
-                            <Avatar name={member.name} className="w-9 h-9 text-sm" />
-                            <span className="flex-1 font-medium text-slate-800 dark:text-slate-200">{member.name}</span>
-                            
-                            {splitMethod === 'custom' ? (
-                                <div className="flex items-center gap-2">
-                                    <span className="text-slate-500 font-medium">{currencySymbol}</span>
-                                    <Input
-                                        type="number"
-                                        step="0.01"
-                                        className="w-32 text-right font-semibold !py-2"
-                                        value={isChecked ? allocation?.amount.toFixed(2) : '0.00'}
-                                        onChange={(e) => updateAllocation(member.id!, e.target.value)}
-                                        onFocus={(e) => e.target.select()}
-                                        disabled={!isChecked || totalAmount === 0}
-                                    />
-                                </div>
-                            ) : (
-                                <span className="font-semibold text-slate-700 dark:text-slate-300 w-32 text-right pr-3">
-                                    {currencySymbol}{memberShare.toFixed(2)}
-                                </span>
-                            )}
-                        </li>
-                    );
-                })}
-            </ul>
-            <div className={`mt-4 text-right font-semibold text-sm pr-3 ${remainingAmountIsZero ? 'text-green-500' : 'text-red-500'}`}>
-              {remainingAmount.toFixed(2)} remaining
-            </div>
-        </Card>
+              <ul className="space-y-3">
+                  {membersOfSelectedGroup.map(member => {
+                      const isChecked = involvedMembers.has(member.id!);
+                      const allocation = allocations.find(a => a.memberId === member.id);
+                      const memberShare = isChecked && splitMethod === 'equally' ? (totalAmount / involvedMembers.size) || 0 : 0;
+                      
+                      return (
+                          <li key={member.id} className="flex items-center gap-4 p-2 rounded-lg">
+                              <input type="checkbox" checked={isChecked} onChange={() => toggleMemberInvolvement(member.id!)} className="h-5 w-5 rounded border-slate-400 dark:border-slate-500 text-primary-600 focus:ring-primary-500 bg-transparent dark:bg-slate-700 checked:bg-primary-600" />
+                              <Avatar name={member.name} className="w-9 h-9 text-sm" />
+                              <span className="flex-1 font-medium text-slate-800 dark:text-slate-200">{member.name}</span>
+                              
+                              {splitMethod === 'custom' ? (
+                                  <div className="flex items-center gap-2">
+                                      <span className="text-slate-500 font-medium">{currencySymbol}</span>
+                                      <Input
+                                          type="number"
+                                          step="0.01"
+                                          className="w-32 text-right font-semibold !py-2"
+                                          value={isChecked ? allocation?.amount.toFixed(2) : '0.00'}
+                                          onChange={(e) => updateAllocation(member.id!, e.target.value)}
+                                          onFocus={(e) => e.target.select()}
+                                          disabled={!isChecked || totalAmount === 0}
+                                      />
+                                  </div>
+                              ) : (
+                                  <span className="font-semibold text-slate-700 dark:text-slate-300 w-32 text-right pr-3">
+                                      {currencySymbol}{memberShare.toFixed(2)}
+                                  </span>
+                              )}
+                          </li>
+                      );
+                  })}
+              </ul>
+              <div className={`mt-4 text-right font-semibold text-sm pr-3 ${remainingAmountIsZero ? 'text-green-500' : 'text-red-500'}`}>
+                {remainingAmount.toFixed(2)} remaining
+              </div>
+          </Card>
+        )}
 
         <Card>
           <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Receipt</h2>
