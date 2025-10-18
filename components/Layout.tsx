@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
-import { PlusCircleIcon } from './common/Icons';
+import { PlusIcon } from './common/Icons';
+import Button from './common/Button';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard' },
@@ -22,7 +23,10 @@ const Layout: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link to="/" className="flex-shrink-0 flex items-center gap-2">
-                 <svg className="w-8 h-8 text-primary-600" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1.92 14.61l-3.69-3.69a.996.996 0 111.41-1.41L10.08 14.2l5.6-5.6a.996.996 0 111.41 1.41l-6.31 6.31a.996.996 0 01-1.41 0z"/></svg>
+                 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" className="text-primary-600">
+                    <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="currentColor" fillOpacity="0.2"></path>
+                    <path d="M16.53 8.97a.75.75 0 010 1.06l-5.5 5.5a.75.75 0 01-1.06 0l-2.5-2.5a.75.75 0 011.06-1.06L10.5 13.94l4.97-4.97a.75.75 0 011.06 0z" fill="currentColor"></path>
+                  </svg>
                 <span className="text-xl font-bold text-slate-800 dark:text-slate-100">EquiShare</span>
               </Link>
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
@@ -38,15 +42,15 @@ const Layout: React.FC = () => {
               </nav>
             </div>
             <div className="flex items-center">
-              <Link to="/expenses/add" className="ml-4 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
-                <PlusCircleIcon className="w-5 h-5 mr-2 -ml-1" />
+              <Button as={Link} to="/expenses/add">
+                <PlusIcon className="w-5 h-5 mr-1" />
                 Add Expense
-              </Link>
+              </Button>
             </div>
           </div>
         </div>
       </header>
-      <main className="bg-slate-100 dark:bg-slate-900">
+      <main>
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <Outlet />
         </div>

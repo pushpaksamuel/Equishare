@@ -1,6 +1,5 @@
 
-
-import Dexie, { type Table } from 'dexie';
+import { Dexie, type Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 

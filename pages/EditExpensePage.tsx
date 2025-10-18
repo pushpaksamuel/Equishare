@@ -1,19 +1,18 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { useData } from '../hooks/useData';
 import { useExpenseSplit } from '../hooks/useExpenseSplit';
+import { formatDate } from '../utils/formatters';
 import { resizeAndEncodeImage } from '../services/imageService';
-import { formatDate, formatCurrency } from '../utils/formatters';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Card from '../components/common/Card';
 import Avatar from '../components/common/Avatar';
-import { RefreshCwIcon } from '../components/common/Icons';
 import type { Expense, Allocation } from '../types';
-import { GoogleGenAI, Type } from '@google/genai';
+import { ImageIcon, Trash2Icon } from '../components/common/Icons';
 
 const EditExpensePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,14 +22,13 @@ const EditExpensePage: React.FC = () => {
   const expense = useLiveQuery(() => db.expenses.get(expenseId), [expenseId]) as Expense | undefined;
   const expenseAllocations = useLiveQuery(() => db.allocations.where('expenseId').equals(expenseId).toArray(), [expenseId]) as Allocation[] | undefined;
   
-  const { group, groupMembers, categories, currencyCode, currencySymbol, loading: dataLoading } = useData();
+  const { group, groupMembers, categories, currencySymbol, loading: dataLoading } = useData();
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [payerId, setPayerId] = useState<number | ''>('');
   const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
-  const [isParsing, setIsParsing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const initialAllocations = useMemo(() => {
@@ -63,79 +61,19 @@ const EditExpensePage: React.FC = () => {
 
   const sortedCategories = useMemo(() => [...categories].sort((a,b) => a.name.localeCompare(b.name)), [categories]);
   
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleReceiptUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
-      setIsParsing(true);
       try {
         const base64Image = await resizeAndEncodeImage(file);
         setReceiptImage(base64Image);
-
-        const base64Data = base64Image.split(',')[1];
-        if (!base64Data) {
-          throw new Error('Could not extract base64 data from image.');
-        }
-
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-        const imagePart = {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: base64Data,
-          },
-        };
-
-        const availableCategories = sortedCategories.map(c => c.name).join(', ');
-        const textPart = {
-          text: `Analyze this receipt image and extract the expense details. The available categories are: ${availableCategories}. The date should be in YYYY-MM-DD format. For any field you cannot determine, use a null value.`,
-        };
-        
-        const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: { parts: [imagePart, textPart] },
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                description: { type: Type.STRING, description: "A short description of the expense from the receipt." },
-                amount: { type: Type.NUMBER, description: "The total amount of the expense." },
-                date: { type: Type.STRING, description: "The date of the expense in YYYY-MM-DD format." },
-                category: { type: Type.STRING, description: `The most fitting category from this list: ${availableCategories}` },
-              },
-            },
-          },
-        });
-        
-        const jsonStr = response.text.trim();
-        const parsedData = JSON.parse(jsonStr);
-
-        if (parsedData.description) {
-          setDescription(parsedData.description);
-        }
-        if (parsedData.amount) {
-          setAmount(parsedData.amount.toString());
-        }
-        if (parsedData.date) {
-           if (/^\d{4}-\d{2}-\d{2}$/.test(parsedData.date)) {
-            setDate(parsedData.date);
-          }
-        }
-        if (parsedData.category) {
-          const matchedCategory = sortedCategories.find(c => c.name.toLowerCase() === parsedData.category.toLowerCase());
-          if (matchedCategory) {
-            setCategoryId(matchedCategory.id!);
-          }
-        }
       } catch (error) {
-        console.error("Image processing or analysis failed:", error);
-        alert("Failed to process and analyze the receipt image. Please enter the details manually.");
-      } finally {
-        setIsParsing(false);
+        console.error("Failed to process image:", error);
+        alert("There was an error processing the image. Please try another file.");
       }
     }
   };
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!group || !isValid || !payerId || !categoryId || !description.trim()) {
@@ -149,8 +87,8 @@ const EditExpensePage: React.FC = () => {
           description,
           amount: totalAmount,
           date: new Date(date),
-          categoryId: categoryId,
-          payerMemberId: payerId,
+          categoryId: Number(categoryId),
+          payerMemberId: Number(payerId),
           receiptImage,
         });
 
@@ -172,33 +110,35 @@ const EditExpensePage: React.FC = () => {
   if (loading) return <div>Loading...</div>;
   if (!group || groupMembers.length === 0) return <div>Group or members not found.</div>;
   
+  const remainingAmountIsZero = Math.abs(remainingAmount) < 0.01;
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
-        <h1 className="text-3xl font-bold">Edit Expense</h1>
+    <div className="max-w-4xl mx-auto animate-fade-in">
+      <h1 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Edit Expense</h1>
+      <form onSubmit={handleSubmit} className="space-y-6">
         
         <Card>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label htmlFor="description" className="block text-sm font-medium">Description</label>
+              <label htmlFor="description" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Description</label>
               <Input id="description" value={description} onChange={e => setDescription(e.target.value)} required />
             </div>
             <div>
-              <label htmlFor="amount" className="block text-sm font-medium">Amount ({currencyCode})</label>
+              <label htmlFor="amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Amount</label>
               <Input id="amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
             </div>
             <div>
-              <label htmlFor="date" className="block text-sm font-medium">Date</label>
+              <label htmlFor="date" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Date</label>
               <Input id="date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
             </div>
             <div>
-              <label htmlFor="category" className="block text-sm font-medium">Category</label>
+              <label htmlFor="category" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Category</label>
               <Select id="category" value={categoryId} onChange={e => setCategoryId(Number(e.target.value))} required>
                 {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </div>
             <div className="col-span-1 md:col-span-2">
-              <label htmlFor="payer" className="block text-sm font-medium">Paid by</label>
+              <label htmlFor="payer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Paid by</label>
               <Select id="payer" value={payerId} onChange={e => setPayerId(Number(e.target.value))} required>
                 {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </Select>
@@ -207,51 +147,82 @@ const EditExpensePage: React.FC = () => {
         </Card>
 
         <Card>
-          <h2 className="text-xl font-semibold mb-4">Split Details</h2>
-          <div className="flex gap-2 mb-6">
-            <Button type="button" size="sm" className="flex-1" variant={splitMethod === 'equally' ? 'primary' : 'secondary'} onClick={() => setSplitMethod('equally')}>Equally</Button>
-            <Button type="button" size="sm" className="flex-1" variant={splitMethod === 'custom' ? 'secondary' : 'primary'} onClick={() => setSplitMethod('custom')}>Custom</Button>
-          </div>
+            <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Split Details</h2>
+            <div className="flex items-center gap-2 mb-6 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg w-48">
+                <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'equally' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('equally')}>Equally</button>
+                <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-primary-600 text-white shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
+            </div>
 
-          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
-            {groupMembers.map(member => {
-              const isChecked = involvedMembers.has(member.id!);
-              const allocation = allocations.find(a => a.memberId === member.id);
-              return (
-                 <li key={member.id} className="flex items-center gap-3 py-3">
-                  <input type="checkbox" checked={isChecked} onChange={() => toggleMemberInvolvement(member.id!)} className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-                  <Avatar name={member.name} className="w-8 h-8 text-xs" />
-                  <span className="flex-1 font-medium">{member.name}</span>
-                  {splitMethod === 'custom' ? (
-                    <div className="flex items-center gap-1">
-                       <span className="text-slate-500">{currencyCode === 'USD' ? 'US' : ''}{currencySymbol}</span>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className="w-28 text-right"
-                        value={isChecked ? allocation?.amount.toFixed(2) : '0.00'}
-                        onChange={(e) => updateAllocation(member.id!, e.target.value)}
-                        disabled={!isChecked}
-                      />
-                    </div>
-                  ) : (
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 w-28 text-right pr-3">
-                       {currencyCode === 'USD' ? 'US' : ''}{formatCurrency((isChecked ? (totalAmount / involvedMembers.size) || 0 : 0), currencyCode)}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-4 text-right font-semibold">
-            <p className={Math.abs(remainingAmount) < 0.01 ? 'text-green-600' : 'text-red-600'}>
+            <ul className="space-y-3">
+                {groupMembers.map(member => {
+                    const isChecked = involvedMembers.has(member.id!);
+                    const allocation = allocations.find(a => a.memberId === member.id);
+                    const memberShare = isChecked && splitMethod === 'equally' ? (totalAmount / involvedMembers.size) || 0 : 0;
+                    
+                    return (
+                        <li key={member.id} className="flex items-center gap-4 p-2 rounded-lg">
+                            <input type="checkbox" checked={isChecked} onChange={() => toggleMemberInvolvement(member.id!)} className="h-5 w-5 rounded border-slate-400 dark:border-slate-500 text-primary-600 focus:ring-primary-500 bg-transparent dark:bg-slate-700 checked:bg-primary-600" />
+                            <Avatar name={member.name} className="w-9 h-9 text-sm" />
+                            <span className="flex-1 font-medium text-slate-800 dark:text-slate-200">{member.name}</span>
+                            
+                            {splitMethod === 'custom' ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-500 font-medium">{currencySymbol}</span>
+                                    <Input
+                                        type="number"
+                                        step="0.01"
+                                        className="w-32 text-right font-semibold !py-2"
+                                        value={isChecked ? allocation?.amount.toFixed(2) : '0.00'}
+                                        onChange={(e) => updateAllocation(member.id!, e.target.value)}
+                                        onFocus={(e) => e.target.select()}
+                                        disabled={!isChecked || totalAmount === 0}
+                                    />
+                                </div>
+                            ) : (
+                                <span className="font-semibold text-slate-700 dark:text-slate-300 w-32 text-right pr-3">
+                                    {currencySymbol}{memberShare.toFixed(2)}
+                                </span>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+            <div className={`mt-4 text-right font-semibold text-sm pr-3 ${remainingAmountIsZero ? 'text-green-500' : 'text-red-500'}`}>
               {remainingAmount.toFixed(2)} remaining
-            </p>
-          </div>
+            </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Receipt</h2>
+          {receiptImage ? (
+            <div className="relative group">
+              <img src={receiptImage} alt="Receipt preview" className="rounded-lg max-h-60 w-auto mx-auto" />
+              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity rounded-lg">
+                <Button variant="danger" size="sm" onClick={() => setReceiptImage(undefined)}>
+                  <Trash2Icon className="w-4 h-4 mr-1" />
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleReceiptUpload}
+                className="hidden"
+              />
+              <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                <ImageIcon className="w-5 h-5 mr-2" />
+                Upload Receipt
+              </Button>
+            </div>
+          )}
         </Card>
         
         <div className="flex justify-end gap-3 pt-4">
-          <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
+          <Button type="button" variant="secondary" onClick={() => navigate('/expenses')}>Cancel</Button>
           <Button type="submit" disabled={!isValid}>Update Expense</Button>
         </div>
       </form>

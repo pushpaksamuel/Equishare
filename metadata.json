@@ -1,5 +1,7 @@
 {
   "name": "EquiShare",
   "description": "A cross-platform, offline-first expense tracking app for Android, web, and Windows with local-only storage, featuring auto-split for roommates, photo/manual expense entry, configurable categories, per-person labels, and analytics showing where money is spent the most.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }
