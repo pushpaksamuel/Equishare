@@ -25,7 +25,7 @@ function App() {
     if (themeSetting?.value) {
       setTheme(themeSetting.value);
     }
-  }, [themeSetting, setTheme]);
+  }, [themeSetting?.value, setTheme]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -35,12 +35,16 @@ function App() {
     }
   }, [theme]);
   
-  // The query is loading if onboardedSetting is undefined.
-  // It is not onboarded if the setting is null or its value is not true.
-  const isLoading = onboardedSetting === undefined;
+  // The query for onboardedSetting can return undefined if the setting is not found,
+  // which is indistinguishable from the initial loading state of useLiveQuery.
+  // This was causing an infinite loading screen for new users.
+  // By setting isLoading to false, we prevent this, with the minor tradeoff of
+  // briefly showing the onboarding page for existing users on first load.
+  const isLoading = false;
   const isOnboarded = onboardedSetting?.value === true;
 
   if (isLoading) {
+    // This block is now effectively dead code but kept for clarity.
     return <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300">Loading...</div>;
   }
 

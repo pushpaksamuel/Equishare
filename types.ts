@@ -34,6 +34,13 @@ export interface Allocation {
   amount: number;
 }
 
+export interface User {
+  id?: number;
+  name: string;
+  email?: string;
+  contactInfo?: string;
+}
+
 export interface Setting {
   id: string; // 'theme', 'currency', 'onboarded'
   value: any;

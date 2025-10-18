@@ -1,6 +1,7 @@
 
-import { Dexie, type Table } from 'dexie';
-import type { Group, Member, Category, Expense, Allocation, Setting } from './types';
+
+import Dexie, { type Table } from 'dexie';
+import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 
 export class AppDatabase extends Dexie {
@@ -10,6 +11,7 @@ export class AppDatabase extends Dexie {
   expenses!: Table<Expense, number>;
   allocations!: Table<Allocation, number>;
   settings!: Table<Setting, string>;
+  users!: Table<User, number>;
 
   constructor() {
     super('EquiShareDB');
@@ -20,6 +22,17 @@ export class AppDatabase extends Dexie {
       expenses: '++id, groupId, date, categoryId, payerMemberId',
       allocations: '++id, expenseId, memberId',
       settings: 'id',
+    });
+
+    // Version 2 adds the users table
+    this.version(2).stores({
+      groups: '++id, name',
+      members: '++id, groupId, name',
+      categories: '++id, name',
+      expenses: '++id, groupId, date, categoryId, payerMemberId',
+      allocations: '++id, expenseId, memberId',
+      settings: 'id',
+      users: '++id, name',
     });
   }
 

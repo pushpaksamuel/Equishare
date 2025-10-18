@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Member } from '../types';
 
 export type AllocationInput = {
@@ -21,63 +21,63 @@ export function useExpenseSplit(
   allMembers: Member[],
   initialAllocations: { memberId: number; amount: number }[] = []
 ) {
-  const initialSplitMethod = initialAllocations.length > 0 && !areInitialAllocationsEqual(initialAllocations) ? 'custom' : 'equally';
-  const [splitMethod, setSplitMethod] = useState<'equally' | 'custom'>(initialSplitMethod);
-  
-  const [involvedMembers, setInvolvedMembers] = useState<Set<number>>(() => {
-    const involved = initialAllocations.filter(a => a.amount > 0.005).map(a => a.memberId);
-    return new Set(involved.length > 0 ? involved : allMembers.map(m => m.id!));
-  });
-
+  const [splitMethod, setSplitMethod] = useState<'equally' | 'custom'>('equally');
+  const [involvedMembers, setInvolvedMembers] = useState<Set<number>>(new Set());
   const [allocations, setAllocations] = useState<AllocationInput[]>([]);
 
-  const initializeAllocations = useCallback(() => {
+  // Effect to initialize or reset the hook's state when props change (e.g., loading initial data on edit page)
+  useEffect(() => {
+    const isEditMode = initialAllocations.length > 0;
+    
+    // 1. Determine the split method
+    const newSplitMethod = isEditMode && !areInitialAllocationsEqual(initialAllocations) ? 'custom' : 'equally';
+    setSplitMethod(newSplitMethod);
+
+    // 2. Determine involved members
+    const involved = isEditMode
+      ? initialAllocations.filter(a => a.amount > 0.005).map(a => a.memberId)
+      : allMembers.map(m => m.id!);
+    setInvolvedMembers(new Set(involved));
+
+    // 3. Initialize allocation amounts
     const newAllocations = allMembers.map(member => {
-      const existing = initialAllocations.find(a => a.memberId === member.id);
+      const existing = isEditMode ? initialAllocations.find(a => a.memberId === member.id) : undefined;
       return {
         memberId: member.id!,
         amount: existing?.amount || 0,
       };
     });
     setAllocations(newAllocations);
-  }, [allMembers, initialAllocations]);
 
-  useEffect(() => {
-    initializeAllocations();
-  }, [initializeAllocations]);
-  
-  const handleSplitMethodChange = (method: 'equally' | 'custom') => {
-     if (method === 'custom' && splitMethod === 'equally' && totalAmount > 0) {
-      // Pre-fill custom amounts with equal split values when switching
-      if (involvedMembers.size > 0) {
-        const amountPerPerson = totalAmount / involvedMembers.size;
-        setAllocations(prev =>
-          prev.map(alloc => ({
-            ...alloc,
-            amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
-          }))
-        );
-      }
-    }
-    setSplitMethod(method);
-  }
+  }, [initialAllocations, allMembers]);
 
 
+  // Effect to recalculate equal split amounts when dependencies change
   useEffect(() => {
     if (splitMethod === 'equally') {
-      if (involvedMembers.size > 0) {
-        const amountPerPerson = totalAmount / involvedMembers.size;
-        setAllocations(prev =>
-          prev.map(alloc => ({
-            ...alloc,
-            amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
-          }))
-        );
-      } else {
-        setAllocations(prev => prev.map(alloc => ({...alloc, amount: 0})));
-      }
+      const amountPerPerson = involvedMembers.size > 0 ? totalAmount / involvedMembers.size : 0;
+      setAllocations(prev =>
+        prev.map(alloc => ({
+          ...alloc,
+          amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
+        }))
+      );
     }
   }, [totalAmount, involvedMembers, splitMethod]);
+
+  const handleSplitMethodChange = (method: 'equally' | 'custom') => {
+     if (method === 'custom' && splitMethod === 'equally' && totalAmount > 0) {
+      // When switching from equal to custom, pre-fill custom amounts with the calculated equal split values
+      const amountPerPerson = involvedMembers.size > 0 ? totalAmount / involvedMembers.size : 0;
+      setAllocations(prev =>
+        prev.map(alloc => ({
+          ...alloc,
+          amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
+        }))
+      );
+    }
+    setSplitMethod(method);
+  };
 
   const toggleMemberInvolvement = (memberId: number) => {
     setInvolvedMembers(prev => {
@@ -107,7 +107,7 @@ export function useExpenseSplit(
   
   const remainingAmount = useMemo(() => totalAmount - totalAllocated, [totalAmount, totalAllocated]);
 
-  const isValid = useMemo(() => Math.abs(remainingAmount) < 0.01 && involvedMembers.size > 0, [remainingAmount, involvedMembers]);
+  const isValid = useMemo(() => Math.abs(remainingAmount) < 0.01 && involvedMembers.size > 0 && totalAmount > 0, [remainingAmount, involvedMembers, totalAmount]);
   
   const finalAllocations = useMemo(() => {
     return allocations

@@ -1,15 +1,22 @@
 import React from 'react';
 
-interface CardProps {
+type CardProps<C extends React.ElementType> = {
+  as?: C;
   children: React.ReactNode;
   className?: string;
-}
+} & React.ComponentPropsWithoutRef<C>;
 
-const Card: React.FC<CardProps> = ({ children, className = '' }) => {
+const Card = <C extends React.ElementType = 'div'>({
+  as,
+  children,
+  className = '',
+  ...props
+}: CardProps<C>) => {
+  const Component = as || 'div';
   return (
-    <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 ${className}`}>
+    <Component className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm p-6 ${className}`} {...props}>
       {children}
-    </div>
+    </Component>
   );
 };
 

@@ -11,8 +11,9 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Card from '../components/common/Card';
 import Avatar from '../components/common/Avatar';
-import { ImageIcon } from '../components/common/Icons';
+import { RefreshCwIcon } from '../components/common/Icons';
 import type { Expense, Allocation } from '../types';
+import { GoogleGenAI, Type } from '@google/genai';
 
 const EditExpensePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +30,7 @@ const EditExpensePage: React.FC = () => {
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [payerId, setPayerId] = useState<number | ''>('');
   const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
+  const [isParsing, setIsParsing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const initialAllocations = useMemo(() => {
@@ -64,12 +66,72 @@ const EditExpensePage: React.FC = () => {
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsParsing(true);
       try {
-        const encoded = await resizeAndEncodeImage(file);
-        setReceiptImage(encoded);
+        const base64Image = await resizeAndEncodeImage(file);
+        setReceiptImage(base64Image);
+
+        const base64Data = base64Image.split(',')[1];
+        if (!base64Data) {
+          throw new Error('Could not extract base64 data from image.');
+        }
+
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+        const imagePart = {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: base64Data,
+          },
+        };
+
+        const availableCategories = sortedCategories.map(c => c.name).join(', ');
+        const textPart = {
+          text: `Analyze this receipt image and extract the expense details. The available categories are: ${availableCategories}. The date should be in YYYY-MM-DD format. For any field you cannot determine, use a null value.`,
+        };
+        
+        const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: { parts: [imagePart, textPart] },
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                description: { type: Type.STRING, description: "A short description of the expense from the receipt." },
+                amount: { type: Type.NUMBER, description: "The total amount of the expense." },
+                date: { type: Type.STRING, description: "The date of the expense in YYYY-MM-DD format." },
+                category: { type: Type.STRING, description: `The most fitting category from this list: ${availableCategories}` },
+              },
+            },
+          },
+        });
+        
+        const jsonStr = response.text.trim();
+        const parsedData = JSON.parse(jsonStr);
+
+        if (parsedData.description) {
+          setDescription(parsedData.description);
+        }
+        if (parsedData.amount) {
+          setAmount(parsedData.amount.toString());
+        }
+        if (parsedData.date) {
+           if (/^\d{4}-\d{2}-\d{2}$/.test(parsedData.date)) {
+            setDate(parsedData.date);
+          }
+        }
+        if (parsedData.category) {
+          const matchedCategory = sortedCategories.find(c => c.name.toLowerCase() === parsedData.category.toLowerCase());
+          if (matchedCategory) {
+            setCategoryId(matchedCategory.id!);
+          }
+        }
       } catch (error) {
-        console.error("Image processing failed:", error);
-        alert("Failed to process image.");
+        console.error("Image processing or analysis failed:", error);
+        alert("Failed to process and analyze the receipt image. Please enter the details manually.");
+      } finally {
+        setIsParsing(false);
       }
     }
   };
@@ -92,7 +154,6 @@ const EditExpensePage: React.FC = () => {
           receiptImage,
         });
 
-        // Clear old allocations and add new ones
         await db.allocations.where('expenseId').equals(expenseId).delete();
         const allocationsToAdd = finalAllocations.map(alloc => ({
           ...alloc,
@@ -112,103 +173,89 @@ const EditExpensePage: React.FC = () => {
   if (!group || groupMembers.length === 0) return <div>Group or members not found.</div>;
   
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
-      <h1 className="text-3xl font-bold">Edit Expense</h1>
-      
-      <Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium">Description</label>
-            <Input id="description" value={description} onChange={e => setDescription(e.target.value)} required />
+    <div className="max-w-4xl mx-auto">
+      <form onSubmit={handleSubmit} className="space-y-6 animate-fade-in">
+        <h1 className="text-3xl font-bold">Edit Expense</h1>
+        
+        <Card>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium">Description</label>
+              <Input id="description" value={description} onChange={e => setDescription(e.target.value)} required />
+            </div>
+            <div>
+              <label htmlFor="amount" className="block text-sm font-medium">Amount ({currencyCode})</label>
+              <Input id="amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
+            </div>
+            <div>
+              <label htmlFor="date" className="block text-sm font-medium">Date</label>
+              <Input id="date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
+            </div>
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium">Category</label>
+              <Select id="category" value={categoryId} onChange={e => setCategoryId(Number(e.target.value))} required>
+                {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </div>
+            <div className="col-span-1 md:col-span-2">
+              <label htmlFor="payer" className="block text-sm font-medium">Paid by</label>
+              <Select id="payer" value={payerId} onChange={e => setPayerId(Number(e.target.value))} required>
+                {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </Select>
+            </div>
           </div>
-          <div>
-            <label htmlFor="amount" className="block text-sm font-medium">Amount ({currencyCode})</label>
-            <Input id="amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
-          </div>
-          <div>
-            <label htmlFor="date" className="block text-sm font-medium">Date</label>
-            <Input id="date" type="date" value={date} onChange={e => setDate(e.target.value)} required />
-          </div>
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium">Category</label>
-            <Select id="category" value={categoryId} onChange={e => setCategoryId(Number(e.target.value))} required>
-              {sortedCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          </div>
-          <div className="col-span-1 md:col-span-2">
-            <label htmlFor="payer" className="block text-sm font-medium">Paid by</label>
-            <Select id="payer" value={payerId} onChange={e => setPayerId(Number(e.target.value))} required>
-              {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </Select>
-          </div>
-        </div>
-      </Card>
+        </Card>
 
-      <Card>
-        <h2 className="text-xl font-semibold mb-4">Split Details</h2>
-        <div className="flex gap-2 mb-6 border border-slate-200 dark:border-slate-700 rounded-lg p-1 max-w-min">
-          <Button type="button" size="sm" className="flex-1" variant={splitMethod === 'equally' ? 'primary' : 'secondary'} onClick={() => setSplitMethod('equally')}>Equally</Button>
-          <Button type="button" size="sm" className="flex-1" variant={splitMethod === 'custom' ? 'primary' : 'secondary'} onClick={() => setSplitMethod('custom')}>Custom</Button>
-        </div>
+        <Card>
+          <h2 className="text-xl font-semibold mb-4">Split Details</h2>
+          <div className="flex gap-2 mb-6">
+            <Button type="button" size="sm" className="flex-1" variant={splitMethod === 'equally' ? 'primary' : 'secondary'} onClick={() => setSplitMethod('equally')}>Equally</Button>
+            <Button type="button" size="sm" className="flex-1" variant={splitMethod === 'custom' ? 'secondary' : 'primary'} onClick={() => setSplitMethod('custom')}>Custom</Button>
+          </div>
 
-        <ul className="space-y-2">
-          {groupMembers.map(member => {
-            const isChecked = involvedMembers.has(member.id!);
-            const allocation = allocations.find(a => a.memberId === member.id);
-            return (
-               <li key={member.id} className={`flex items-center gap-3 p-2 rounded-lg transition-colors ${isChecked ? 'bg-primary-50 dark:bg-primary-500/10' : ''}`}>
-                <input type="checkbox" checked={isChecked} onChange={() => toggleMemberInvolvement(member.id!)} className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
-                <Avatar name={member.name} className="w-8 h-8 text-xs" />
-                <span className="flex-1 font-medium">{member.name}</span>
-                {splitMethod === 'custom' ? (
-                  <div className="flex items-center gap-1">
-                     <span className="text-slate-500">{currencySymbol}</span>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      className="w-28 text-right"
-                      value={isChecked ? allocation?.amount.toFixed(2) : '0.00'}
-                      onChange={(e) => updateAllocation(member.id!, e.target.value)}
-                      disabled={!isChecked}
-                    />
-                  </div>
-                ) : (
-                  <span className="font-mono text-slate-700 dark:text-slate-300 w-28 text-right pr-3">
-                    {formatCurrency((isChecked ? (totalAmount / involvedMembers.size) || 0 : 0), currencyCode)}
-                  </span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        <div className="mt-4 text-right font-semibold">
-          <p className={Math.abs(remainingAmount) < 0.01 ? 'text-green-600' : 'text-red-600'}>
-            {remainingAmount.toFixed(2)} remaining
-          </p>
+          <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+            {groupMembers.map(member => {
+              const isChecked = involvedMembers.has(member.id!);
+              const allocation = allocations.find(a => a.memberId === member.id);
+              return (
+                 <li key={member.id} className="flex items-center gap-3 py-3">
+                  <input type="checkbox" checked={isChecked} onChange={() => toggleMemberInvolvement(member.id!)} className="h-5 w-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500" />
+                  <Avatar name={member.name} className="w-8 h-8 text-xs" />
+                  <span className="flex-1 font-medium">{member.name}</span>
+                  {splitMethod === 'custom' ? (
+                    <div className="flex items-center gap-1">
+                       <span className="text-slate-500">{currencyCode === 'USD' ? 'US' : ''}{currencySymbol}</span>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        className="w-28 text-right"
+                        value={isChecked ? allocation?.amount.toFixed(2) : '0.00'}
+                        onChange={(e) => updateAllocation(member.id!, e.target.value)}
+                        disabled={!isChecked}
+                      />
+                    </div>
+                  ) : (
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 w-28 text-right pr-3">
+                       {currencyCode === 'USD' ? 'US' : ''}{formatCurrency((isChecked ? (totalAmount / involvedMembers.size) || 0 : 0), currencyCode)}
+                    </span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <div className="mt-4 text-right font-semibold">
+            <p className={Math.abs(remainingAmount) < 0.01 ? 'text-green-600' : 'text-red-600'}>
+              {remainingAmount.toFixed(2)} remaining
+            </p>
+          </div>
+        </Card>
+        
+        <div className="flex justify-end gap-3 pt-4">
+          <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
+          <Button type="submit" disabled={!isValid}>Update Expense</Button>
         </div>
-      </Card>
-      
-       <Card>
-          <h2 className="text-xl font-semibold mb-4">Receipt</h2>
-           {receiptImage ? (
-                 <div className="relative group">
-                    <img src={receiptImage} alt="Receipt preview" className="rounded-lg max-h-60" />
-                    <Button variant="danger" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setReceiptImage(undefined)}>Remove</Button>
-                </div>
-            ) : (
-                <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
-                    <ImageIcon className="w-5 h-5 mr-2" />
-                    Upload Receipt
-                </Button>
-            )}
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-      </Card>
-
-      <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-        <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
-        <Button type="submit" disabled={!isValid}>Update Expense</Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 };
 

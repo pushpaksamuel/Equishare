@@ -1,11 +1,14 @@
+
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { CURRENCIES } from '../constants';
-import type { Group, Member, Category, ExpenseWithDetails, Expense, Allocation } from '../types';
+import type { Group, Member, Category, ExpenseWithDetails, Expense, Allocation, User } from '../types';
 
 export function useData() {
   const groups = useLiveQuery(() => db.groups.toArray(), []) as Group[] | undefined;
   const group = groups?.[0]; // Assuming single group for now
+  
+  const user = useLiveQuery(() => db.users.toCollection().first(), []) as User | undefined;
 
   const groupMembers = useLiveQuery(
     () => (group ? db.members.where('groupId').equals(group.id!).toArray() : []),
@@ -53,9 +56,10 @@ export function useData() {
 
   // FIX: The original loading logic was incorrect. `!group` would be true if `groups` loaded as an empty array,
   // causing an infinite loading state. This now correctly checks if the initial data queries are unresolved.
-  const loading = groups === undefined || groupMembers === undefined || categories === undefined || expensesWithDetails === undefined;
+  const loading = user === undefined || groups === undefined || groupMembers === undefined || categories === undefined || expensesWithDetails === undefined;
 
   return { 
+    user,
     group,
     groupMembers: groupMembers || [], 
     categories: categories || [], 
