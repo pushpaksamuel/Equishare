@@ -1,5 +1,6 @@
-// FIX: Corrected Dexie import to resolve method typing issues by removing the 'type' modifier, which can interfere with type resolution in some toolchains.
-import Dexie, { Table } from 'dexie';
+// FIX: Use an explicit default import for Dexie to resolve issues where TypeScript might not correctly infer it as a class value. This ensures methods like .version() are available.
+import { default as Dexie } from 'dexie';
+import type { Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 

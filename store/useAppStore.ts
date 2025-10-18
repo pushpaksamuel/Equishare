@@ -7,6 +7,9 @@ interface AppState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  isLoggedIn: boolean;
+  login: () => void;
+  logout: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -22,4 +25,7 @@ export const useAppStore = create<AppState>((set) => ({
       return { theme: newTheme };
     });
   },
+  isLoggedIn: false,
+  login: () => set({ isLoggedIn: true }),
+  logout: () => set({ isLoggedIn: false }),
 }));

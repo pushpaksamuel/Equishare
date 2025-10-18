@@ -5,6 +5,7 @@ import { db } from '../db';
 import { formatCurrency } from '../utils/formatters';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
+import Modal from '../components/common/Modal';
 import { EditIcon, Trash2Icon, FilterIcon, CalendarIcon, MoreVerticalIcon, ReceiptIcon, ChevronDownIcon } from '../components/common/Icons';
 import type { ExpenseWithDetails } from '../types';
 
@@ -18,6 +19,8 @@ const ExpensesPage: React.FC = () => {
   const { expenses, currencyCode, loading } = useData();
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(10); // Show 10 expenses initially
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<number | null>(null);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -29,17 +32,24 @@ const ExpensesPage: React.FC = () => {
     };
   }, []);
 
-  const handleDeleteExpense = async (expenseId: number) => {
-    if (window.confirm('Are you sure you want to delete this expense? This action cannot be undone.')) {
-      try {
-        await db.transaction('rw', db.expenses, db.allocations, async () => {
-          await db.allocations.where('expenseId').equals(expenseId).delete();
-          await db.expenses.delete(expenseId);
-        });
-      } catch (error) {
-        console.error('Failed to delete expense:', error);
-        alert('There was an error deleting the expense.');
-      }
+  const handleDeleteExpense = (expenseId: number) => {
+    setExpenseToDelete(expenseId);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteExpense = async () => {
+    if (!expenseToDelete) return;
+    try {
+      await db.transaction('rw', db.expenses, db.allocations, async () => {
+        await db.allocations.where('expenseId').equals(expenseToDelete).delete();
+        await db.expenses.delete(expenseToDelete);
+      });
+    } catch (error) {
+      console.error('Failed to delete expense:', error);
+      alert('There was an error deleting the expense.');
+    } finally {
+      setExpenseToDelete(null);
+      setDeleteModalOpen(false);
     }
   };
 
@@ -128,6 +138,15 @@ const ExpensesPage: React.FC = () => {
             </div>
           )}
       </Card>
+      <Modal isOpen={isDeleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Confirm Delete Expense">
+          <p className="text-slate-600 dark:text-slate-400 mb-6">
+              Are you sure you want to delete this expense? This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3 pt-2">
+              <Button type="button" variant="secondary" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+              <Button type="button" variant="danger" onClick={confirmDeleteExpense}>Delete</Button>
+          </div>
+      </Modal>
     </div>
   );
 };

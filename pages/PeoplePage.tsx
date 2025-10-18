@@ -12,6 +12,8 @@ const PeoplePage: React.FC = () => {
   const { group, groupMembers, loading } = useData();
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
+  const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<number | null>(null);
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,15 +42,23 @@ const PeoplePage: React.FC = () => {
           return;
       }
       
-      if (window.confirm("Are you sure you want to delete this member? This cannot be undone.")) {
-          try {
-              await db.members.delete(memberId);
-          } catch(error) {
-              console.error("Failed to delete member", error);
-              alert("There was an error deleting the member.");
-          }
-      }
+      setMemberToDelete(memberId);
+      setDeleteModalOpen(true);
   }
+
+  const confirmDeleteMember = async () => {
+    if (!memberToDelete) return;
+
+    try {
+        await db.members.delete(memberToDelete);
+    } catch(error) {
+        console.error("Failed to delete member", error);
+        alert("There was an error deleting the member.");
+    } finally {
+        setMemberToDelete(null);
+        setDeleteModalOpen(false);
+    }
+  };
 
   if (loading) return <div>Loading...</div>;
 
@@ -90,6 +100,16 @@ const PeoplePage: React.FC = () => {
             <Button type="submit">Add Member</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={isDeleteModalOpen} onClose={() => setDeleteModalOpen(false)} title="Confirm Delete Member">
+        <p className="text-slate-600 dark:text-slate-400 mb-6">
+            Are you sure you want to delete this member? This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>
+            <Button type="button" variant="danger" onClick={confirmDeleteMember}>Delete</Button>
+        </div>
       </Modal>
     </div>
   );

@@ -7,6 +7,7 @@ import { useAppStore } from './store/useAppStore';
 import Layout from './components/Layout';
 import WelcomePage from './pages/WelcomePage';
 import OnboardingPage from './pages/OnboardingPage';
+import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ExpensesPage from './pages/ExpensesPage';
 import AddExpensePage from './pages/AddExpensePage';
@@ -17,7 +18,7 @@ import GroupsPage from './pages/GroupsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function App() {
-  const { theme, setTheme } = useAppStore();
+  const { theme, setTheme, isLoggedIn } = useAppStore();
 
   const onboardedSetting = useLiveQuery(() => db.settings.get('onboarded'));
   const themeSetting = useLiveQuery(() => db.settings.get('theme'));
@@ -56,7 +57,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        {isOnboarded ? (
+        {isLoggedIn ? (
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
@@ -67,16 +68,18 @@ function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            {/* Redirect any onboarding routes to dashboard if already onboarded */}
+            {/* Redirect any onboarding/auth routes to dashboard if logged in */}
             <Route path="welcome" element={<Navigate to="/dashboard" replace />} />
             <Route path="onboarding" element={<Navigate to="/dashboard" replace />} />
+            <Route path="login" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         ) : (
            <>
             <Route path="/welcome" element={<WelcomePage />} />
             <Route path="/onboarding" element={<OnboardingPage />} />
-            <Route path="*" element={<Navigate to="/welcome" replace />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="*" element={<Navigate to={isOnboarded ? "/login" : "/welcome"} replace />} />
            </>
         )}
       </Routes>

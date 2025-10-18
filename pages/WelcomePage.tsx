@@ -1,22 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
 import Button from '../components/common/Button';
 
 const WelcomePage: React.FC = () => {
   const navigate = useNavigate();
-  const onboardedSetting = useLiveQuery(() => db.settings.get('onboarded'));
 
   const handleLogin = () => {
-    // In a real app, this would be a login form.
-    // For this local-first app, we check if they've completed onboarding.
-    if (onboardedSetting?.value === true) {
-      navigate('/dashboard');
-    } else {
-      // If they click login but haven't onboarded, send them to onboarding.
-      navigate('/onboarding');
-    }
+    navigate('/login');
   };
 
   const handleSignUp = () => {

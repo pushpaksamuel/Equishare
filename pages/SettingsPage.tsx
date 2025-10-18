@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { exportData, importData } from '../services/backupService';
 import { useData } from '../hooks/useData';
@@ -8,11 +9,13 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
+import { LogOutIcon } from '../components/common/Icons';
 
 const SettingsPage: React.FC = () => {
-  const { theme, toggleTheme } = useAppStore();
+  const { theme, toggleTheme, logout } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user, loading } = useData();
+  const navigate = useNavigate();
 
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -82,6 +85,13 @@ const SettingsPage: React.FC = () => {
       alert("There was an error saving your information.");
     } finally {
       setIsSaving(false);
+    }
+  };
+  
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to log out?")) {
+      logout();
+      navigate('/login', { replace: true });
     }
   };
 
@@ -167,6 +177,16 @@ const SettingsPage: React.FC = () => {
               onChange={handleFileChange}
             />
           </div>
+        </Card>
+      </section>
+      
+      <section>
+        <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Account</h2>
+        <Card>
+          <Button onClick={handleLogout} variant="danger" className="w-full sm:w-auto">
+            <LogOutIcon className="w-5 h-5 mr-2" />
+            Log Out
+          </Button>
         </Card>
       </section>
     </div>

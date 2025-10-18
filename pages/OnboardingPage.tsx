@@ -7,12 +7,15 @@ import Input from '../components/common/Input';
 import Select from '../components/common/Select';
 import Card from '../components/common/Card';
 import { Trash2Icon, UserIcon, UsersIcon, HeartIcon } from '../components/common/Icons';
+import { useAppStore } from '../store/useAppStore';
 
 type UsageType = 'individual' | 'family' | 'group';
 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState(1);
   const navigate = useNavigate();
+  const { login } = useAppStore();
+
   // Step 1: User info
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
@@ -104,11 +107,9 @@ const OnboardingPage: React.FC = () => {
         await db.settings.put({ id: 'currency', value: currency });
       });
 
-      // Instead of reload, navigate to dashboard
+      // After successful setup, log the user in and navigate to the dashboard
+      login();
       navigate('/dashboard', { replace: true });
-      // Force a full page reload to ensure all states are cleared and data is fresh.
-      // This is a simple way to handle the state transition after a major setup change.
-      setTimeout(() => window.location.reload(), 100);
 
     } catch (error) {
       console.error('Onboarding failed:', error);
