@@ -8,6 +8,7 @@ import Layout from './components/Layout';
 import WelcomePage from './pages/WelcomePage';
 import OnboardingPage from './pages/OnboardingPage';
 import LoginPage from './pages/LoginPage';
+import GetStartedPage from './pages/GetStartedPage';
 import DashboardPage from './pages/DashboardPage';
 import ExpensesPage from './pages/ExpensesPage';
 import AddExpensePage from './pages/AddExpensePage';
@@ -58,22 +59,28 @@ function App() {
     <Router>
       <Routes>
         {isLoggedIn ? (
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="expenses" element={<ExpensesPage />} />
-            <Route path="expenses/add" element={<AddExpensePage />} />
-            <Route path="expenses/edit/:id" element={<EditExpensePage />} />
-            <Route path="people" element={<PeoplePage />} />
-            <Route path="analytics" element={<AnalyticsPage />} />
-            <Route path="groups" element={<GroupsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
-            {/* Redirect any onboarding/auth routes to dashboard if logged in */}
-            <Route path="welcome" element={<Navigate to="/dashboard" replace />} />
-            <Route path="onboarding" element={<Navigate to="/dashboard" replace />} />
-            <Route path="login" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
+          <>
+            {/* Standalone pages for logged-in users */}
+            <Route path="/get-started" element={<GetStartedPage />} />
+
+            {/* Layout-wrapped pages */}
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Navigate to="/dashboard" replace />} />
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="expenses" element={<ExpensesPage />} />
+              <Route path="expenses/add" element={<AddExpensePage />} />
+              <Route path="expenses/edit/:id" element={<EditExpensePage />} />
+              <Route path="people" element={<PeoplePage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
+              <Route path="groups" element={<GroupsPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              {/* Redirect any old auth routes to dashboard if somehow accessed while logged in */}
+              <Route path="welcome" element={<Navigate to="/dashboard" replace />} />
+              <Route path="onboarding" element={<Navigate to="/dashboard" replace />} />
+              <Route path="login" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Route>
+          </>
         ) : (
            <>
             <Route path="/welcome" element={<WelcomePage />} />

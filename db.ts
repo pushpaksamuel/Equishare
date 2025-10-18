@@ -1,6 +1,5 @@
-// FIX: Use an explicit default import for Dexie to resolve issues where TypeScript might not correctly infer it as a class value. This ensures methods like .version() are available.
-import { default as Dexie } from 'dexie';
-import type { Table } from 'dexie';
+// FIX: Changed Dexie import to the standard format `import Dexie, { type Table } from 'dexie';` to correctly resolve the Dexie class and its methods, fixing compilation errors across the application.
+import Dexie, { type Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 

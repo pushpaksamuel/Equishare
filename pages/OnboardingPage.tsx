@@ -107,9 +107,9 @@ const OnboardingPage: React.FC = () => {
         await db.settings.put({ id: 'currency', value: currency });
       });
 
-      // After successful setup, log the user in and navigate to the dashboard
+      // After successful setup, log the user in and navigate to the get-started page
       login();
-      navigate('/dashboard', { replace: true });
+      navigate('/get-started', { replace: true });
 
     } catch (error) {
       console.error('Onboarding failed:', error);
