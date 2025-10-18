@@ -1,97 +1,48 @@
-// FIX: Changed Dexie to a named import to resolve type errors for Dexie methods.
-import { Dexie, type Table } from 'dexie';
-import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
+import Dexie, { type Table } from 'dexie';
+import type { Group, Member, Category, Expense, Allocation, User, Setting } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 
-export class AppDatabase extends Dexie {
-  groups!: Table<Group, number>;
-  members!: Table<Member, number>;
-  categories!: Table<Category, number>;
-  expenses!: Table<Expense, number>;
-  allocations!: Table<Allocation, number>;
-  settings!: Table<Setting, string>;
-  users!: Table<User, number>;
+export const db = new Dexie('equishareDB') as Dexie & {
+  groups: Table<Group, number>;
+  members: Table<Member, number>;
+  categories: Table<Category, number>;
+  expenses: Table<Expense, number>;
+  allocations: Table<Allocation, number>;
+  settings: Table<Setting, string>;
+  users: Table<User, number>;
+};
 
-  constructor() {
-    super('EquiShareDB');
-
-    // Version 1 schema
-    this.version(1).stores({
-      groups: '++id, name',
-      members: '++id, groupId, name',
-      categories: '++id, name',
-      expenses: '++id, groupId, date, categoryId, payerMemberId',
-      allocations: '++id, expenseId, memberId',
-      // FIX: The primary key for the settings table must be 'id' to match the Setting interface and usage in the app.
-      settings: 'id',
-    });
-
-    // Version 2 adds the users table
-    this.version(2).stores({
-      groups: '++id, name',
-      members: '++id, groupId, name',
-      categories: '++id, name',
-      expenses: '++id, groupId, date, categoryId, payerMemberId',
-      allocations: '++id, expenseId, memberId',
-      settings: 'id',
-      users: '++id, name',
-    });
-
-    // Version 3 adds password to users table
-    this.version(3).stores({
-      groups: '++id, name',
-      members: '++id, groupId, name',
-      categories: '++id, name',
-      expenses: '++id, groupId, date, categoryId, payerMemberId',
-      allocations: '++id, expenseId, memberId',
-      settings: 'id',
-      users: '++id, name, email, password',
-    });
-
-    // Version 4 adds type to groups table
-    this.version(4).stores({
-      groups: '++id, name, type',
-      members: '++id, groupId, name',
-      categories: '++id, name',
-      expenses: '++id, groupId, date, categoryId, payerMemberId',
-      allocations: '++id, expenseId, memberId',
-      settings: 'id',
-      users: '++id, name, email, password',
-    });
-  }
-
-  async seed() {
-    // Seed predefined categories if none exist
-    const categoryCount = await this.categories.count();
-    if (categoryCount === 0) {
-      await this.categories.bulkAdd(PREDEFINED_CATEGORIES);
-    }
-
-    // Add default settings if missing
-    const onboarded = await this.settings.get('onboarded');
-    if (!onboarded) {
-      // FIX: Use 'id' as the key for settings to match the schema.
-      await this.settings.put({ id: 'onboarded', value: false });
-    }
-
-    const theme = await this.settings.get('theme');
-    if (!theme) {
-      // FIX: Use 'id' as the key for settings to match the schema.
-      await this.settings.put({ id: 'theme', value: 'light' });
-    }
-  }
-}
-
-export const db = new AppDatabase();
-
-// Populate when database is first created
-db.on('populate', async () => {
-  await db.seed();
+db.version(4).stores({
+  groups: '++id, name, type',
+  members: '++id, groupId, name',
+  categories: '++id, name',
+  expenses: '++id, groupId, date, categoryId, payerMemberId',
+  allocations: '++id, expenseId, memberId',
+  settings: 'id',
+  users: '++id, &email'
 });
 
-// Also ensure seeding runs after DB opens normally
+db.on('populate', async () => {
+  // This hook only runs once when the database is first created.
+  // We initialize it with predefined categories and essential settings.
+  await db.categories.bulkAdd(PREDEFINED_CATEGORIES);
+  await db.settings.bulkAdd([
+    { id: 'theme', value: 'light' },
+    { id: 'onboarded', value: false } // Ensures the app doesn't get stuck on first load.
+  ]);
+});
+
+// This block ensures the database is ready and performs a safety check.
 db.open()
-  .then(() => db.seed())
+  .then(async () => {
+    // This safety check is crucial for users with existing databases from older versions
+    // that might not have the 'onboarded' setting. It prevents the app from getting stuck.
+    const onboardedSetting = await db.settings.get('onboarded');
+    if (onboardedSetting === undefined) {
+      console.log("Onboarding setting not found, initializing to prevent loading issues.");
+      await db.settings.put({ id: 'onboarded', value: false });
+    }
+  })
   .catch(err => {
     console.error(`Failed to open db: ${err.stack || err}`);
   });
