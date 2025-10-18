@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
@@ -25,6 +24,7 @@ const AddExpensePage: React.FC = () => {
   const [categoryId, setCategoryId] = useState<number | ''>('');
   const [payerId, setPayerId] = useState<number | ''>('');
   const [receiptImage, setReceiptImage] = useState<string | undefined>(undefined);
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedGroup = useMemo(() => allGroups.find(g => g.id === selectedGroupId), [allGroups, selectedGroupId]);
@@ -68,7 +68,8 @@ const AddExpensePage: React.FC = () => {
       alert('Please fill out all required fields and ensure the split is correct.');
       return;
     }
-
+    
+    setIsSaving(true);
     try {
       await db.transaction('rw', db.expenses, db.allocations, async () => {
         const expenseId = await db.expenses.add({
@@ -87,10 +88,12 @@ const AddExpensePage: React.FC = () => {
         }));
         await db.allocations.bulkAdd(allocationsToAdd);
       });
-      navigate('/expenses');
+      navigate('/expenses', { replace: true });
     } catch (error) {
       console.error('Failed to add expense:', error);
       alert('There was an error adding the expense.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -147,7 +150,7 @@ const AddExpensePage: React.FC = () => {
               <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Split Details</h2>
               <div className="flex items-center gap-2 mb-6 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg w-48">
                   <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'equally' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('equally')}>Equally</button>
-                  <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-primary-600 text-white shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
+                  <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
               </div>
 
               <ul className="space-y-3">
@@ -221,7 +224,9 @@ const AddExpensePage: React.FC = () => {
         
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4">
           <Button type="button" variant="secondary" onClick={() => navigate('/expenses')}>Cancel</Button>
-          <Button type="submit" disabled={!isValid}>Save Expense</Button>
+          <Button type="submit" disabled={!isValid || isSaving}>
+            {isSaving ? 'Saving...' : 'Save Expense'}
+          </Button>
         </div>
       </form>
     </div>

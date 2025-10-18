@@ -1,5 +1,3 @@
-
-
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { CURRENCIES } from '../constants';
@@ -11,13 +9,18 @@ export function useData() {
   
   // Fetch all core data
   const allGroups = useLiveQuery(() => db.groups.toArray(), []) as Group[] | undefined;
-  const allMembers = useLiveQuery(() => db.members.toArray(), []) as Member[] | undefined;
+  const allMembersQuery = useLiveQuery(() => db.members.toArray(), []) as Member[] | undefined;
   const categories = useLiveQuery(() => db.categories.toArray(), []) as Category[] | undefined;
   const allExpenses = useLiveQuery(() => db.expenses.reverse().sortBy('date'), []) as Expense[] | undefined;
   const allAllocations = useLiveQuery(
     () => (allExpenses ? db.allocations.where('expenseId').anyOf(allExpenses.map(e => e.id!)).toArray() : []),
     [allExpenses]
   ) as Allocation[] | undefined;
+  
+  // FIX: Memoize the `allMembers` array to ensure a stable reference is passed to child components,
+  // preventing unnecessary re-renders and state resets in hooks like `useExpenseSplit`.
+  const allMembers = useMemo(() => allMembersQuery || [], [allMembersQuery]);
+
 
   // Memoize detailed expense calculations
   const allExpensesWithDetails: ExpenseWithDetails[] | undefined = useMemo(() => {
@@ -85,13 +88,13 @@ export function useData() {
   const currencyCode = group?.currency || 'USD';
   const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol || '$';
 
-  const loading = user === undefined || allGroups === undefined || allMembers === undefined || categories === undefined || allExpensesWithDetails === undefined;
+  const loading = user === undefined || allGroups === undefined || allMembersQuery === undefined || categories === undefined || allExpensesWithDetails === undefined;
 
   return { 
     user,
     // Raw data
     allGroups: allGroups || [],
-    allMembers: allMembers || [],
+    allMembers: allMembers,
     categories: categories || [],
     allExpenses: allExpensesWithDetails || [],
     // Categorized Data

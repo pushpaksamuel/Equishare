@@ -6,6 +6,7 @@ import { useData } from '../hooks/useData';
 import { useExpenseSplit } from '../hooks/useExpenseSplit';
 import { formatDate } from '../utils/formatters';
 import { resizeAndEncodeImage } from '../services/imageService';
+import { CURRENCIES } from '../constants';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -22,7 +23,23 @@ const EditExpensePage: React.FC = () => {
   const expense = useLiveQuery(() => db.expenses.get(expenseId), [expenseId]) as Expense | undefined;
   const expenseAllocations = useLiveQuery(() => db.allocations.where('expenseId').equals(expenseId).toArray(), [expenseId]) as Allocation[] | undefined;
   
-  const { group, groupMembers, categories, currencySymbol, loading: dataLoading } = useData();
+  const { allGroups, allMembers, categories, loading: dataLoading } = useData();
+
+  const expenseGroup = useMemo(() => allGroups.find(g => g.id === expense?.groupId), [allGroups, expense?.groupId]);
+  
+  // FIX: Stabilize the `membersOfExpenseGroup` array reference by depending on the stable `expense.groupId`
+  // instead of the entire `expense` object, which could be a new reference on each render. This prevents
+  // the `useExpenseSplit` hook from resetting its state (like the selected split method).
+  const membersOfExpenseGroup = useMemo(() => {
+      if (!expense?.groupId) return [];
+      return allMembers.filter(m => m.groupId === expense.groupId);
+  }, [allMembers, expense?.groupId]);
+
+  const currencySymbol = useMemo(() => {
+    if (!expenseGroup) return '$';
+    return CURRENCIES.find(c => c.code === expenseGroup.currency)?.symbol || '$';
+  }, [expenseGroup]);
+
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
@@ -46,7 +63,7 @@ const EditExpensePage: React.FC = () => {
     remainingAmount,
     isValid,
     finalAllocations
-  } = useExpenseSplit(totalAmount, groupMembers, initialAllocations);
+  } = useExpenseSplit(totalAmount, membersOfExpenseGroup, initialAllocations);
 
   useEffect(() => {
     if (expense) {
@@ -76,7 +93,7 @@ const EditExpensePage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!group || !isValid || !payerId || !categoryId || !description.trim()) {
+    if (!expenseGroup || !isValid || !payerId || !categoryId || !description.trim()) {
       alert('Please fill out all required fields and ensure the split is correct.');
       return;
     }
@@ -108,7 +125,7 @@ const EditExpensePage: React.FC = () => {
 
   const loading = dataLoading || !expense || !expenseAllocations;
   if (loading) return <div>Loading...</div>;
-  if (!group || groupMembers.length === 0) return <div>Group or members not found.</div>;
+  if (!expenseGroup || membersOfExpenseGroup.length === 0) return <div>Group or members not found for this expense.</div>;
   
   const remainingAmountIsZero = Math.abs(remainingAmount) < 0.01;
 
@@ -140,7 +157,7 @@ const EditExpensePage: React.FC = () => {
             <div className="col-span-1 md:col-span-2">
               <label htmlFor="payer" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Paid by</label>
               <Select id="payer" value={payerId} onChange={e => setPayerId(Number(e.target.value))} required>
-                {groupMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                {membersOfExpenseGroup.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
               </Select>
             </div>
           </div>
@@ -150,11 +167,11 @@ const EditExpensePage: React.FC = () => {
             <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Split Details</h2>
             <div className="flex items-center gap-2 mb-6 bg-slate-200 dark:bg-slate-700 p-1 rounded-lg w-48">
                 <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'equally' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('equally')}>Equally</button>
-                <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-primary-600 text-white shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
+                <button type="button" className={`flex-1 p-2 rounded-md text-sm font-semibold transition-all duration-200 ${splitMethod === 'custom' ? 'bg-white dark:bg-slate-800 text-primary-600 shadow' : 'text-slate-600 dark:text-slate-300'}`} onClick={() => setSplitMethod('custom')}>Custom</button>
             </div>
 
             <ul className="space-y-3">
-                {groupMembers.map(member => {
+                {membersOfExpenseGroup.map(member => {
                     const isChecked = involvedMembers.has(member.id!);
                     const allocation = allocations.find(a => a.memberId === member.id);
                     const memberShare = isChecked && splitMethod === 'equally' ? (totalAmount / involvedMembers.size) || 0 : 0;
