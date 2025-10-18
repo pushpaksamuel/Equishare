@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
-import { CURRENCIES } from '../constants';
+import { CURRENCIES, COUNTRY_CODES } from '../constants';
 import Button from '../components/common/Button';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
@@ -16,6 +16,7 @@ const OnboardingPage: React.FC = () => {
   // Step 1: User info
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  const [countryCode, setCountryCode] = useState('+1');
   const [userContact, setUserContact] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -89,7 +90,7 @@ const OnboardingPage: React.FC = () => {
     try {
       await db.transaction('rw', db.users, db.groups, db.members, db.settings, async () => {
         // Add User
-        await db.users.add({ name: userName.trim(), email: userEmail.trim(), contactInfo: userContact.trim(), password });
+        await db.users.add({ name: userName.trim(), email: userEmail.trim(), contactInfo: `${countryCode}${userContact.trim()}`, password });
         
         // Create Group
         const groupId = await db.groups.add({ name: finalGroupName, currency });
@@ -132,7 +133,26 @@ const OnboardingPage: React.FC = () => {
               </div>
               <div>
                 <label htmlFor="userContact" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mobile Number <span className="text-red-500">*</span></label>
-                <Input id="userContact" value={userContact} onChange={(e) => setUserContact(e.target.value)} placeholder="e.g., +1 555-123-4567" required onKeyDown={(e) => handleKeyDown(e, () => document.getElementById('password')?.focus())} />
+                <div className="flex mt-1">
+                    <Select
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                        className="!mt-0 rounded-r-none w-28"
+                        aria-label="Country code"
+                    >
+                        {COUNTRY_CODES.map(c => <option key={c.code} value={c.dial_code}>{c.code} ({c.dial_code})</option>)}
+                    </Select>
+                    <Input
+                        id="userContact"
+                        type="tel"
+                        value={userContact}
+                        onChange={(e) => setUserContact(e.target.value)}
+                        placeholder="555-123-4567"
+                        required
+                        onKeyDown={(e) => handleKeyDown(e, () => document.getElementById('password')?.focus())}
+                        className="!mt-0 rounded-l-none"
+                    />
+                </div>
               </div>
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Password <span className="text-red-500">*</span></label>

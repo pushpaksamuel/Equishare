@@ -3,9 +3,11 @@ import { useAppStore } from '../store/useAppStore';
 import { exportData, importData } from '../services/backupService';
 import { useData } from '../hooks/useData';
 import { db } from '../db';
+import { COUNTRY_CODES } from '../constants';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Input from '../components/common/Input';
+import Select from '../components/common/Select';
 
 const SettingsPage: React.FC = () => {
   const { theme, toggleTheme } = useAppStore();
@@ -14,7 +16,8 @@ const SettingsPage: React.FC = () => {
 
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
-  const [userContact, setUserContact] = useState('');
+  const [countryCode, setCountryCode] = useState('+1');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
@@ -22,7 +25,21 @@ const SettingsPage: React.FC = () => {
     if (user) {
       setUserName(user.name);
       setUserEmail(user.email || '');
-      setUserContact(user.contactInfo || '');
+      
+      const contact = user.contactInfo || '';
+      // Find the longest matching country code prefix to handle codes like +1, +1242, etc.
+      const matchedCode = COUNTRY_CODES
+        .sort((a, b) => b.dial_code.length - a.dial_code.length)
+        .find(c => contact.startsWith(c.dial_code));
+
+      if (matchedCode) {
+        setCountryCode(matchedCode.dial_code);
+        setPhoneNumber(contact.substring(matchedCode.dial_code.length));
+      } else {
+        // Fallback if no code matches (e.g., old data without a code)
+        setCountryCode('+1'); 
+        setPhoneNumber(contact);
+      }
     }
   }, [user]);
 
@@ -56,7 +73,7 @@ const SettingsPage: React.FC = () => {
       await db.users.update(user.id!, {
         name: userName,
         email: userEmail,
-        contactInfo: userContact,
+        contactInfo: `${countryCode}${phoneNumber.trim()}`,
       });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000); // Reset after 2s
@@ -88,8 +105,25 @@ const SettingsPage: React.FC = () => {
                 <Input id="userEmail" type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} />
               </div>
               <div>
-                <label htmlFor="userContact" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mobile Number</label>
-                <Input id="userContact" value={userContact} onChange={(e) => setUserContact(e.target.value)} placeholder="e.g., +1 555-123-4567" />
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mobile Number</label>
+                 <div className="flex mt-1">
+                    <Select
+                        value={countryCode}
+                        onChange={(e) => setCountryCode(e.target.value)}
+                        className="!mt-0 rounded-r-none w-28"
+                        aria-label="Country code"
+                    >
+                        {COUNTRY_CODES.map(c => <option key={c.code} value={c.dial_code}>{c.code} ({c.dial_code})</option>)}
+                    </Select>
+                    <Input
+                        id="phoneNumber"
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder="555-123-4567"
+                        className="!mt-0 rounded-l-none"
+                    />
+                </div>
               </div>
               <div className="flex justify-end pt-2">
                 <Button type="submit" disabled={isSaving || saveSuccess}>

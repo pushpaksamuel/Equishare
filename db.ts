@@ -1,5 +1,5 @@
-// FIX: Changed Dexie import to use a default import to resolve method typing issues.
-import Dexie, { type Table } from 'dexie';
+// FIX: Corrected Dexie import to resolve method typing issues by removing the 'type' modifier, which can interfere with type resolution in some toolchains.
+import Dexie, { Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 
@@ -22,7 +22,8 @@ export class AppDatabase extends Dexie {
       categories: '++id, name',
       expenses: '++id, groupId, date, categoryId, payerMemberId',
       allocations: '++id, expenseId, memberId',
-      settings: 'key', // ✅ changed from 'id' to 'key'
+      // FIX: The primary key for the settings table must be 'id' to match the Setting interface and usage in the app.
+      settings: 'id',
     });
 
     // Version 2 adds the users table
@@ -32,7 +33,7 @@ export class AppDatabase extends Dexie {
       categories: '++id, name',
       expenses: '++id, groupId, date, categoryId, payerMemberId',
       allocations: '++id, expenseId, memberId',
-      settings: 'key',
+      settings: 'id',
       users: '++id, name',
     });
 
@@ -43,39 +44,41 @@ export class AppDatabase extends Dexie {
       categories: '++id, name',
       expenses: '++id, groupId, date, categoryId, payerMemberId',
       allocations: '++id, expenseId, memberId',
-      settings: 'key',
+      settings: 'id',
       users: '++id, name, email, password',
     });
   }
 
   async seed() {
-    // ✅ Seed predefined categories if none exist
+    // Seed predefined categories if none exist
     const categoryCount = await this.categories.count();
     if (categoryCount === 0) {
       await this.categories.bulkAdd(PREDEFINED_CATEGORIES);
     }
 
-    // ✅ Add default settings if missing
+    // Add default settings if missing
     const onboarded = await this.settings.get('onboarded');
     if (!onboarded) {
-      await this.settings.put({ key: 'onboarded', value: false });
+      // FIX: Use 'id' as the key for settings to match the schema.
+      await this.settings.put({ id: 'onboarded', value: false });
     }
 
     const theme = await this.settings.get('theme');
     if (!theme) {
-      await this.settings.put({ key: 'theme', value: 'light' });
+      // FIX: Use 'id' as the key for settings to match the schema.
+      await this.settings.put({ id: 'theme', value: 'light' });
     }
   }
 }
 
 export const db = new AppDatabase();
 
-// ✅ Populate when database is first created
+// Populate when database is first created
 db.on('populate', async () => {
   await db.seed();
 });
 
-// ✅ Also ensure seeding runs after DB opens normally
+// Also ensure seeding runs after DB opens normally
 db.open()
   .then(() => db.seed())
   .catch(err => {
