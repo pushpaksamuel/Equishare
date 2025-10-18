@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
 import { CURRENCIES } from '../constants';
 import Button from '../components/common/Button';
@@ -11,16 +12,27 @@ type UsageType = 'individual' | 'family' | 'group';
 
 const OnboardingPage: React.FC = () => {
   const [step, setStep] = useState(1);
+  const navigate = useNavigate();
   // Step 1: User info
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [userContact, setUserContact] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   // Step 2: Usage Type
   const [usageType, setUsageType] = useState<UsageType | null>(null);
   // Step 3: Group info
   const [groupName, setGroupName] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [memberNames, setMemberNames] = useState<string[]>(['', '']);
+  
+  const nextStep = () => setStep(s => s + 1);
+  const prevStep = () => setStep(s => s - 1);
+  
+  const passwordsMatch = password && password === confirmPassword;
+  const canGoToStep2 = userName.trim() && userEmail.trim() && userContact.trim() && password && passwordsMatch;
+  const canGoToStep3 = !!usageType;
+  const canFinishGroupSetup = groupName.trim() && !memberNames.some(n => !n.trim());
 
   // Pre-fill first member name with user's name
   useEffect(() => {
@@ -48,6 +60,13 @@ const OnboardingPage: React.FC = () => {
       setMemberNames(newNames);
     }
   };
+  
+  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      action();
+    }
+  }
 
   const handleFinish = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +80,7 @@ const OnboardingPage: React.FC = () => {
     } else {
         finalGroupName = groupName.trim();
         finalMembers = memberNames.map(name => name.trim()).filter(name => name);
-        if (!finalGroupName || finalMembers.length < 1) {
+        if (!canFinishGroupSetup) {
             alert('Please fill in all required fields.');
             return;
         }
@@ -70,7 +89,7 @@ const OnboardingPage: React.FC = () => {
     try {
       await db.transaction('rw', db.users, db.groups, db.members, db.settings, async () => {
         // Add User
-        await db.users.add({ name: userName.trim(), email: userEmail.trim(), contactInfo: userContact.trim() });
+        await db.users.add({ name: userName.trim(), email: userEmail.trim(), contactInfo: userContact.trim(), password });
         
         // Create Group
         const groupId = await db.groups.add({ name: finalGroupName, currency });
@@ -84,7 +103,11 @@ const OnboardingPage: React.FC = () => {
         await db.settings.put({ id: 'currency', value: currency });
       });
 
-      window.location.reload();
+      // Instead of reload, navigate to dashboard
+      navigate('/dashboard', { replace: true });
+      // Force a full page reload to ensure all states are cleared and data is fresh.
+      // This is a simple way to handle the state transition after a major setup change.
+      setTimeout(() => window.location.reload(), 100);
 
     } catch (error) {
       console.error('Onboarding failed:', error);
@@ -100,20 +123,31 @@ const OnboardingPage: React.FC = () => {
             <h2 className="text-xl font-semibold mb-6">Step 1: Your Details</h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="userName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Your Name</label>
-                <Input id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required placeholder="e.g., Jane Doe" />
+                <label htmlFor="userName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Your Name <span className="text-red-500">*</span></label>
+                <Input id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required placeholder="e.g., Jane Doe" autoFocus onKeyDown={(e) => handleKeyDown(e, () => document.getElementById('userEmail')?.focus())}/>
               </div>
                <div>
-                <label htmlFor="userEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email <span className="text-slate-500">(Optional)</span></label>
-                <Input id="userEmail" type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="you@example.com" />
+                <label htmlFor="userEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email <span className="text-red-500">*</span></label>
+                <Input id="userEmail" type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} placeholder="you@example.com" required onKeyDown={(e) => handleKeyDown(e, () => document.getElementById('userContact')?.focus())}/>
               </div>
               <div>
-                <label htmlFor="userContact" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Contact Info <span className="text-slate-500">(Optional)</span></label>
-                <Input id="userContact" value={userContact} onChange={(e) => setUserContact(e.target.value)} placeholder="Phone number, etc." />
+                <label htmlFor="userContact" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mobile Number <span className="text-red-500">*</span></label>
+                <Input id="userContact" value={userContact} onChange={(e) => setUserContact(e.target.value)} placeholder="e.g., +1 555-123-4567" required onKeyDown={(e) => handleKeyDown(e, () => document.getElementById('password')?.focus())} />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Password <span className="text-red-500">*</span></label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Enter a secure password" onKeyDown={(e) => handleKeyDown(e, () => document.getElementById('confirmPassword')?.focus())} />
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Confirm Password <span className="text-red-500">*</span></label>
+                <Input id="confirmPassword" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required placeholder="Confirm your password" onKeyDown={(e) => handleKeyDown(e, () => canGoToStep2 && nextStep())} />
+                {password && confirmPassword && !passwordsMatch && (
+                  <p className="text-red-500 text-xs mt-1">Passwords do not match.</p>
+                )}
               </div>
             </div>
             <div className="mt-8 flex justify-end">
-              <Button type="button" onClick={() => setStep(2)} disabled={!userName.trim()}>Next Step</Button>
+              <Button type="button" onClick={nextStep} disabled={!canGoToStep2}>Next Step</Button>
             </div>
           </Card>
         );
@@ -124,25 +158,25 @@ const OnboardingPage: React.FC = () => {
           <Card className="animate-fade-in">
             <h2 className="text-xl font-semibold mb-6">Step 2: How will you use EquiShare?</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className={`${usageTypeCardClasses} ${usageType === 'individual' ? selectedCardClasses : 'border-slate-300 dark:border-slate-600'}`} onClick={() => setUsageType('individual')}>
+                <div className={`${usageTypeCardClasses} ${usageType === 'individual' ? selectedCardClasses : 'border-slate-300 dark:border-slate-600'}`} onClick={() => { setUsageType('individual'); setTimeout(nextStep, 200); }}>
                     <UserIcon className="w-10 h-10 mx-auto mb-3 text-primary-600 dark:text-primary-400" />
                     <h3 className="font-semibold">For Myself</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Track personal expenses.</p>
                 </div>
-                <div className={`${usageTypeCardClasses} ${usageType === 'family' ? selectedCardClasses : 'border-slate-300 dark:border-slate-600'}`} onClick={() => setUsageType('family')}>
+                <div className={`${usageTypeCardClasses} ${usageType === 'family' ? selectedCardClasses : 'border-slate-300 dark:border-slate-600'}`} onClick={() => { setUsageType('family'); setTimeout(nextStep, 200); }}>
                     <HeartIcon className="w-10 h-10 mx-auto mb-3 text-primary-600 dark:text-primary-400" />
                     <h3 className="font-semibold">For my Family</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Manage family budget.</p>
                 </div>
-                <div className={`${usageTypeCardClasses} ${usageType === 'group' ? selectedCardClasses : 'border-slate-300 dark:border-slate-600'}`} onClick={() => setUsageType('group')}>
+                <div className={`${usageTypeCardClasses} ${usageType === 'group' ? selectedCardClasses : 'border-slate-300 dark:border-slate-600'}`} onClick={() => { setUsageType('group'); setTimeout(nextStep, 200); }}>
                     <UsersIcon className="w-10 h-10 mx-auto mb-3 text-primary-600 dark:text-primary-400" />
                     <h3 className="font-semibold">For a Group</h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Split costs with friends.</p>
                 </div>
             </div>
             <div className="mt-8 flex justify-between">
-              <Button type="button" variant="secondary" onClick={() => setStep(1)}>Back</Button>
-              <Button type="button" onClick={() => setStep(3)} disabled={!usageType}>Next Step</Button>
+              <Button type="button" variant="secondary" onClick={prevStep}>Back</Button>
+              <Button type="button" onClick={nextStep} disabled={!canGoToStep3}>Next Step</Button>
             </div>
           </Card>
         );
@@ -159,7 +193,7 @@ const OnboardingPage: React.FC = () => {
                   </Select>
                 </div>
               <div className="mt-8 flex justify-between">
-                <Button type="button" variant="secondary" onClick={() => setStep(2)}>Back</Button>
+                <Button type="button" variant="secondary" onClick={prevStep}>Back</Button>
                 <Button type="submit">Finish Setup</Button>
               </div>
             </Card>
@@ -170,8 +204,8 @@ const OnboardingPage: React.FC = () => {
             <h2 className="text-xl font-semibold mb-6">Step 3: Setup your {usageType}</h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="groupName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">{usageType === 'family' ? 'Family' : 'Group'} Name</label>
-                <Input id="groupName" value={groupName} onChange={(e) => setGroupName(e.target.value)} required placeholder={usageType === 'family' ? 'e.g., The Doe Family' : 'e.g., Apartment Roomies'} />
+                <label htmlFor="groupName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">{usageType === 'family' ? 'Family' : 'Group'} Name <span className="text-red-500">*</span></label>
+                <Input id="groupName" value={groupName} onChange={(e) => setGroupName(e.target.value)} required placeholder={usageType === 'family' ? 'e.g., The Doe Family' : 'e.g., Apartment Roomies'} autoFocus />
               </div>
               <div>
                 <label htmlFor="currency" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Default Currency</label>
@@ -191,6 +225,12 @@ const OnboardingPage: React.FC = () => {
                           required
                           readOnly={index === 0}
                           className={index === 0 ? 'bg-slate-100 dark:bg-slate-700 cursor-not-allowed' : ''}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && index === memberNames.length - 1 && name.trim() !== '') {
+                                e.preventDefault();
+                                addMemberInput();
+                            }
+                          }}
                         />
                         {memberNames.length > 1 && index > 0 && (
                           <Button type="button" size="icon" variant="danger" onClick={() => removeMemberInput(index)}>
@@ -206,8 +246,8 @@ const OnboardingPage: React.FC = () => {
               </div>
             </div>
             <div className="mt-8 flex justify-between">
-              <Button type="button" variant="secondary" onClick={() => setStep(2)}>Back</Button>
-              <Button type="submit" disabled={!groupName.trim() || memberNames.some(n => !n.trim())}>Finish Setup</Button>
+              <Button type="button" variant="secondary" onClick={prevStep}>Back</Button>
+              <Button type="submit" disabled={!canFinishGroupSetup}>Finish Setup</Button>
             </div>
           </Card>
         );
@@ -219,10 +259,13 @@ const OnboardingPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
-        <h1 className="text-3xl font-bold text-center mb-2 text-primary-600 dark:text-primary-400">Welcome to EquiShare!</h1>
-        <p className="text-center text-slate-600 dark:text-slate-400 mb-8">
-          {step < 3 ? "Let's get you set up." : "Just one more step."}
-        </p>
+         <div className="text-center mb-8">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" className="text-primary-600 mx-auto">
+                <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="currentColor" fillOpacity="0.2"></path>
+                <path d="M16.53 8.97a.75.75 0 010 1.06l-5.5 5.5a.75.75 0 01-1.06 0l-2.5-2.5a.75.75 0 011.06-1.06L10.5 13.94l4.97-4.97a.75.75 0 011.06 0z" fill="currentColor"></path>
+            </svg>
+            <h1 className="text-3xl font-bold text-center mt-2 text-slate-800 dark:text-slate-100">Get Started with EquiShare</h1>
+        </div>
         <form onSubmit={handleFinish}>
           {renderStep()}
         </form>

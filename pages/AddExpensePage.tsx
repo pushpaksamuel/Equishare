@@ -100,7 +100,7 @@ const AddExpensePage: React.FC = () => {
               <Input id="description" value={description} onChange={e => setDescription(e.target.value)} required placeholder="e.g., Dinner with friends" />
             </div>
             <div>
-              <label htmlFor="amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Amount</label>
+              <label htmlFor="amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Amount ({currencySymbol})</label>
               <Input id="amount" type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required placeholder="0.00" />
             </div>
             <div>
@@ -199,7 +199,7 @@ const AddExpensePage: React.FC = () => {
           )}
         </Card>
         
-        <div className="flex justify-end gap-3 pt-4">
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4">
           <Button type="button" variant="secondary" onClick={() => navigate('/expenses')}>Cancel</Button>
           <Button type="submit" disabled={!isValid}>Save Expense</Button>
         </div>

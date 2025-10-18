@@ -1,12 +1,30 @@
-import React, { useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { exportData, importData } from '../services/backupService';
+import { useData } from '../hooks/useData';
+import { db } from '../db';
 import Button from '../components/common/Button';
 import Card from '../components/common/Card';
+import Input from '../components/common/Input';
 
 const SettingsPage: React.FC = () => {
   const { theme, toggleTheme } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user, loading } = useData();
+
+  const [userName, setUserName] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [userContact, setUserContact] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  useEffect(() => {
+    if (user) {
+      setUserName(user.name);
+      setUserEmail(user.email || '');
+      setUserContact(user.contactInfo || '');
+    }
+  }, [user]);
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -23,15 +41,65 @@ const SettingsPage: React.FC = () => {
         }
       }
     }
-    // Reset file input value to allow re-uploading the same file
     if(event.target) {
       event.target.value = '';
+    }
+  };
+
+  const handleUserInfoSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      await db.users.update(user.id!, {
+        name: userName,
+        email: userEmail,
+        contactInfo: userContact,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000); // Reset after 2s
+    } catch (error) {
+      console.error("Failed to update user info:", error);
+      alert("There was an error saving your information.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
     <div className="space-y-8 animate-fade-in">
        <h1 className="text-3xl font-bold">Settings</h1>
+      
+      <section>
+        <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">User Information</h2>
+        <Card>
+          {loading ? (
+            <p>Loading user data...</p>
+          ) : (
+            <form onSubmit={handleUserInfoSave} className="space-y-4">
+              <div>
+                <label htmlFor="userName" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Name</label>
+                <Input id="userName" value={userName} onChange={(e) => setUserName(e.target.value)} required />
+              </div>
+              <div>
+                <label htmlFor="userEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Email</label>
+                <Input id="userEmail" type="email" value={userEmail} onChange={(e) => setUserEmail(e.target.value)} />
+              </div>
+              <div>
+                <label htmlFor="userContact" className="block text-sm font-medium text-slate-700 dark:text-slate-300">Mobile Number</label>
+                <Input id="userContact" value={userContact} onChange={(e) => setUserContact(e.target.value)} placeholder="e.g., +1 555-123-4567" />
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" disabled={isSaving || saveSuccess}>
+                  {isSaving ? 'Saving...' : saveSuccess ? 'Saved!' : 'Save Changes'}
+                </Button>
+              </div>
+            </form>
+          )}
+        </Card>
+      </section>
       
       <section>
         <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Appearance</h2>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, Link } from 'react-router-dom';
-import { PlusIcon } from './common/Icons';
+import { PlusIcon, MenuIcon, XIcon } from './common/Icons';
 import Button from './common/Button';
 
 const navigation = [
@@ -12,6 +12,20 @@ const navigation = [
 ];
 
 const Layout: React.FC = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Prevent scrolling when mobile menu is open
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileMenuOpen]);
+
   const navLinkClasses = "px-1 py-4 text-sm font-medium border-b-2";
   const activeClasses = "text-primary-600 dark:text-primary-400 border-primary-600 dark:border-primary-400";
   const inactiveClasses = "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 border-transparent";
@@ -29,6 +43,7 @@ const Layout: React.FC = () => {
                   </svg>
                 <span className="text-xl font-bold text-slate-800 dark:text-slate-100">EquiShare</span>
               </Link>
+              {/* Desktop Nav */}
               <nav className="hidden md:ml-10 md:flex md:space-x-8">
                 {navigation.map((item) => (
                   <NavLink
@@ -41,15 +56,57 @@ const Layout: React.FC = () => {
                 ))}
               </nav>
             </div>
-            <div className="flex items-center">
-              <Button as={Link} to="/expenses/add">
+            <div className="flex items-center gap-2">
+              {/* Responsive Add Expense Button */}
+              <Button as={Link} to="/expenses/add" className="hidden sm:inline-flex">
                 <PlusIcon className="w-5 h-5 mr-1" />
                 Add Expense
               </Button>
+               <Button as={Link} to="/expenses/add" size="icon" variant="primary" className="sm:hidden">
+                <PlusIcon className="w-5 h-5" />
+                <span className="sr-only">Add Expense</span>
+              </Button>
+              {/* Mobile Menu Button */}
+              <div className="md:hidden">
+                <Button size="icon" variant="secondary" onClick={() => setIsMobileMenuOpen(true)}>
+                    <span className="sr-only">Open menu</span>
+                    <MenuIcon className="w-6 h-6" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </header>
+
+      {/* Mobile Menu Overlay */}
+      <div className={`fixed inset-0 z-40 bg-white dark:bg-slate-900 p-4 transform transition-transform md:hidden ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="flex justify-between items-center mb-8">
+            <span className="text-xl font-bold">Menu</span>
+            <Button size="icon" variant="secondary" onClick={() => setIsMobileMenuOpen(false)}>
+                <span className="sr-only">Close menu</span>
+                <XIcon className="w-6 h-6" />
+            </Button>
+        </div>
+        <nav className="flex flex-col space-y-4">
+             {navigation.map((item) => (
+                <NavLink
+                    key={item.name}
+                    to={item.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={({ isActive }) =>
+                        `text-lg font-medium p-3 rounded-lg ${
+                        isActive
+                            ? 'bg-primary-100 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300'
+                            : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`
+                    }
+                >
+                    {item.name}
+                </NavLink>
+            ))}
+        </nav>
+      </div>
+      
       <main>
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <Outlet />

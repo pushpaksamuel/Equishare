@@ -39,6 +39,7 @@ export interface User {
   name: string;
   email?: string;
   contactInfo?: string;
+  password?: string;
 }
 
 export interface Setting {

@@ -5,6 +5,7 @@ import { db } from './db';
 import { useAppStore } from './store/useAppStore';
 
 import Layout from './components/Layout';
+import WelcomePage from './pages/WelcomePage';
 import OnboardingPage from './pages/OnboardingPage';
 import DashboardPage from './pages/DashboardPage';
 import ExpensesPage from './pages/ExpensesPage';
@@ -35,25 +36,27 @@ function App() {
     }
   }, [theme]);
   
-  // The query for onboardedSetting can return undefined if the setting is not found,
-  // which is indistinguishable from the initial loading state of useLiveQuery.
-  // This was causing an infinite loading screen for new users.
-  // By setting isLoading to false, we prevent this, with the minor tradeoff of
-  // briefly showing the onboarding page for existing users on first load.
-  const isLoading = false;
+  const isLoading = onboardedSetting === undefined;
   const isOnboarded = onboardedSetting?.value === true;
 
   if (isLoading) {
-    // This block is now effectively dead code but kept for clarity.
-    return <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900 text-slate-700 dark:text-slate-300">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900">
+        <div className="text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" className="text-primary-600 mx-auto mb-4 animate-pulse">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="currentColor" fillOpacity="0.2"></path>
+              <path d="M16.53 8.97a.75.75 0 010 1.06l-5.5 5.5a.75.75 0 01-1.06 0l-2.5-2.5a.75.75 0 011.06-1.06L10.5 13.94l4.97-4.97a.75.75 0 011.06 0z" fill="currentColor"></path>
+          </svg>
+          <span className="text-slate-700 dark:text-slate-300">Loading EquiShare...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <Router>
       <Routes>
-        {!isOnboarded ? (
-          <Route path="*" element={<OnboardingPage />} />
-        ) : (
+        {isOnboarded ? (
           <Route path="/" element={<Layout />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
@@ -64,8 +67,17 @@ function App() {
             <Route path="analytics" element={<AnalyticsPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="settings" element={<SettingsPage />} />
+            {/* Redirect any onboarding routes to dashboard if already onboarded */}
+            <Route path="welcome" element={<Navigate to="/dashboard" replace />} />
+            <Route path="onboarding" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
+        ) : (
+           <>
+            <Route path="/welcome" element={<WelcomePage />} />
+            <Route path="/onboarding" element={<OnboardingPage />} />
+            <Route path="*" element={<Navigate to="/welcome" replace />} />
+           </>
         )}
       </Routes>
     </Router>
