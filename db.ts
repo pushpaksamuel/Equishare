@@ -1,6 +1,5 @@
-// FIX: Changed to separate default and type imports for Dexie to resolve method resolution errors.
-import Dexie from 'dexie';
-import type { Table } from 'dexie';
+// FIX: Changed Dexie to a named import to resolve type errors for Dexie methods.
+import { Dexie, type Table } from 'dexie';
 import type { Group, Member, Category, Expense, Allocation, Setting, User } from './types';
 import { PREDEFINED_CATEGORIES } from './constants';
 
