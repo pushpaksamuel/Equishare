@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { useData } from '../hooks/useData';
 import Avatar from './common/Avatar';
@@ -107,10 +107,9 @@ const Layout: React.FC = () => {
             </Button>
             <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">{getPageTitle()}</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <Avatar name={user?.name || 'Samuel'} className="w-9 h-9" />
-            <span className="font-medium hidden sm:block text-slate-700 dark:text-slate-200">{user?.name || 'Samuel'}</span>
-          </div>
+          <Link to="/settings">
+            <Avatar src={user?.avatar} name={user?.name || 'S'} className="w-9 h-9" />
+          </Link>
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">

@@ -117,7 +117,7 @@ const EditExpensePage: React.FC = () => {
         }));
         await db.allocations.bulkAdd(allocationsToAdd);
       });
-      navigate('/expenses');
+      navigate('/expenses', { replace: true });
     } catch (error) {
       console.error('Failed to update expense:', error);
       alert('There was an error updating the expense.');

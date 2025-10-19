@@ -41,6 +41,7 @@ export interface User {
   email?: string;
   contactInfo?: string;
   password?: string;
+  avatar?: string; // base64 encoded image
 }
 
 export interface Setting {

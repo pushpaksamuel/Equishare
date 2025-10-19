@@ -2,10 +2,11 @@ import React from 'react';
 
 interface AvatarProps {
   name: string;
+  src?: string;
   className?: string;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ name, className = '' }) => {
+const Avatar: React.FC<AvatarProps> = ({ name, src, className = '' }) => {
   const getInitials = (nameStr: string) => {
     if (!nameStr) return '?';
     const names = nameStr.trim().split(' ');
@@ -30,8 +31,20 @@ const Avatar: React.FC<AvatarProps> = ({ name, className = '' }) => {
     return colors[index];
   };
 
+  const baseClasses = 'w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm select-none';
+  
+  if (src) {
+    return (
+        <img 
+            src={src} 
+            alt={name} 
+            className={`w-10 h-10 rounded-full object-cover ${className}`}
+        />
+    );
+  }
+
   return (
-    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm select-none ${getBackgroundColor(name)} ${className}`}>
+    <div className={`${baseClasses} ${getBackgroundColor(name)} ${className}`}>
       {getInitials(name)}
     </div>
   );

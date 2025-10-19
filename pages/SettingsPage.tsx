@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { exportData, importData } from '../services/backupService';
+import { resizeAndEncodeImage } from '../services/imageService';
 import { useData } from '../hooks/useData';
 import { db } from '../db';
 import { COUNTRY_CODES } from '../constants';
@@ -10,11 +11,13 @@ import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import Input from '../components/common/Input';
 import Select from '../components/common/Select';
+import Avatar from '../components/common/Avatar';
 import { LogOutIcon } from '../components/common/Icons';
 
 const SettingsPage: React.FC = () => {
   const { theme, toggleTheme, logout } = useAppStore();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const { user, loading } = useData();
   const navigate = useNavigate();
 
@@ -31,7 +34,6 @@ const SettingsPage: React.FC = () => {
       setUserEmail(user.email || '');
       
       const contact = user.contactInfo || '';
-      // Find the longest matching country code prefix to handle codes like +1, +1242, etc.
       const matchedCode = COUNTRY_CODES
         .sort((a, b) => b.dial_code.length - a.dial_code.length)
         .find(c => contact.startsWith(c.dial_code));
@@ -40,7 +42,6 @@ const SettingsPage: React.FC = () => {
         setCountryCode(matchedCode.dial_code);
         setPhoneNumber(contact.substring(matchedCode.dial_code.length));
       } else {
-        // Fallback if no code matches (e.g., old data without a code)
         setCountryCode('+1'); 
         setPhoneNumber(contact);
       }
@@ -48,10 +49,10 @@ const SettingsPage: React.FC = () => {
   }, [user]);
 
   const handleImportClick = () => {
-    fileInputRef.current?.click();
+    importFileInputRef.current?.click();
   };
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       if (window.confirm("Importing will overwrite all existing data. Are you sure you want to continue?")) {
@@ -62,9 +63,21 @@ const SettingsPage: React.FC = () => {
         }
       }
     }
-    if(event.target) {
-      event.target.value = '';
+    if(event.target) event.target.value = '';
+  };
+
+  const handleAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && user) {
+        try {
+            const base64Image = await resizeAndEncodeImage(file);
+            await db.users.update(user.id!, { avatar: base64Image });
+        } catch (error) {
+            console.error("Failed to process image:", error);
+            alert("There was an error updating your avatar.");
+        }
     }
+    if(event.target) event.target.value = '';
   };
 
   const handleUserInfoSave = async (e: React.FormEvent) => {
@@ -80,7 +93,7 @@ const SettingsPage: React.FC = () => {
         contactInfo: `${countryCode}${phoneNumber.trim()}`,
       });
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000); // Reset after 2s
+      setTimeout(() => setSaveSuccess(false), 2000);
     } catch (error) {
       console.error("Failed to update user info:", error);
       alert("There was an error saving your information.");
@@ -99,6 +112,26 @@ const SettingsPage: React.FC = () => {
   return (
     <div className="space-y-8 animate-fade-in">
       
+       <section>
+        <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Profile Picture</h2>
+        <Card>
+            {loading ? (
+                 <p>Loading user data...</p>
+            ) : (
+                <div className="flex items-center gap-6">
+                    <Avatar src={user?.avatar} name={user?.name || ''} className="w-20 h-20 text-3xl" />
+                    <div>
+                        <Button onClick={() => avatarFileInputRef.current?.click()} variant="secondary">
+                            Change Photo
+                        </Button>
+                        <input type="file" ref={avatarFileInputRef} className="hidden" accept="image/*" onChange={handleAvatarFileChange} />
+                        <p className="text-xs text-slate-500 mt-2">Recommended: Square image (JPG, PNG)</p>
+                    </div>
+                </div>
+            )}
+        </Card>
+      </section>
+
       <section>
         <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">User Information</h2>
         <Card>
@@ -171,10 +204,10 @@ const SettingsPage: React.FC = () => {
             <Button onClick={handleImportClick} variant="outline">Import Backup</Button>
             <input
               type="file"
-              ref={fileInputRef}
+              ref={importFileInputRef}
               className="hidden"
               accept=".json"
-              onChange={handleFileChange}
+              onChange={handleImportFileChange}
             />
           </div>
         </Card>

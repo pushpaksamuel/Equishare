@@ -24,6 +24,7 @@ export function useExpenseSplit(
   const [splitMethod, setSplitMethod] = useState<'equally' | 'custom'>('equally');
   const [involvedMembers, setInvolvedMembers] = useState<Set<number>>(new Set());
   const [allocations, setAllocations] = useState<AllocationInput[]>([]);
+  const [isInitialRender, setIsInitialRender] = useState(true);
 
   // Effect to initialize or reset the hook's state when props change (e.g., loading initial data on edit page)
   useEffect(() => {
@@ -48,6 +49,7 @@ export function useExpenseSplit(
       };
     });
     setAllocations(newAllocations);
+    setIsInitialRender(false);
 
   }, [initialAllocations, allMembers]);
 
@@ -64,20 +66,32 @@ export function useExpenseSplit(
       );
     }
   }, [totalAmount, involvedMembers, splitMethod]);
+  
+  // FIX: Added a dedicated effect to pre-fill custom amounts when switching from 'equally'.
+  // This resolves the bug where selecting "Custom" wouldn't work as expected.
+  useEffect(() => {
+    // Prevent this from running on the initial render where state is still being set up.
+    if (isInitialRender) return;
 
-  const handleSplitMethodChange = (method: 'equally' | 'custom') => {
-     if (method === 'custom' && splitMethod === 'equally' && totalAmount > 0) {
-      // When switching from equal to custom, pre-fill custom amounts with the calculated equal split values
+    if (splitMethod === 'custom') {
+      // Check if the current allocations are all zero, which suggests we just switched from 'equally'
+      // where the user hadn't entered any custom amounts yet.
+      const isPristineCustom = allocations.every(a => a.amount === 0);
+      
       const amountPerPerson = involvedMembers.size > 0 ? totalAmount / involvedMembers.size : 0;
-      setAllocations(prev =>
-        prev.map(alloc => ({
-          ...alloc,
-          amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
-        }))
-      );
+      
+      // Only pre-fill if the total is > 0 and custom fields are empty, to avoid overwriting user input.
+      if (totalAmount > 0 && isPristineCustom) {
+        setAllocations(prev =>
+          prev.map(alloc => ({
+            ...alloc,
+            amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
+          }))
+        );
+      }
     }
-    setSplitMethod(method);
-  };
+  }, [splitMethod, isInitialRender]);
+
 
   const toggleMemberInvolvement = (memberId: number) => {
     setInvolvedMembers(prev => {
@@ -118,7 +132,7 @@ export function useExpenseSplit(
 
   return {
     splitMethod,
-    setSplitMethod: handleSplitMethodChange,
+    setSplitMethod,
     allocations,
     updateAllocation,
     involvedMembers,
