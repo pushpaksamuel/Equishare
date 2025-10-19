@@ -200,11 +200,33 @@ const DashboardPage: React.FC = () => {
     user,
     groupTypeMembers, familyMembers, individualMembers,
     groupExpenses, familyExpenses, individualExpenses,
-    currencyCode, loading 
+    currencyCode, loading, allExpenses
   } = useData();
   const [activeTab, setActiveTab] = useState<'group' | 'family' | 'individual'>('group');
 
   if (loading) return <div className="flex items-center justify-center h-full">Loading...</div>;
+
+  const hasAnyExpense = allExpenses.length > 0;
+
+  if (!hasAnyExpense) {
+    return (
+      <div className="flex items-center justify-center h-full animate-fade-in">
+        <Card className="text-center max-w-lg py-12">
+          <div className="w-16 h-16 p-3 mx-auto bg-primary-100 dark:bg-primary-500/20 text-primary-600 dark:text-primary-400 rounded-2xl flex items-center justify-center">
+             <ReceiptIcon className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold mt-4 text-slate-800 dark:text-slate-100">Welcome to your Dashboard!</h2>
+          <p className="text-slate-600 dark:text-slate-400 mt-2 mb-8 max-w-xs mx-auto">
+            Let's get started by adding your first expense. It's quick and easy!
+          </p>
+          <Button as={Link} to="/expenses/add" size="lg">
+              <PlusCircleIcon className="w-6 h-6 mr-2" />
+              Add Your First Expense
+          </Button>
+        </Card>
+      </div>
+    );
+  }
 
   const dataByTab = {
       group: {

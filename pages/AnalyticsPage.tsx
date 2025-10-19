@@ -3,10 +3,11 @@ import { useData } from '../hooks/useData';
 import { formatCurrency } from '../utils/formatters';
 import CategoryChart from '../components/CategoryChart';
 import Card from '../components/common/Card';
-import type { ExpenseWithDetails } from '../types';
+import Avatar from '../components/common/Avatar';
+import type { ExpenseWithDetails, Member } from '../types';
 
 // A component to render analytics for a given set of expenses
-const AnalyticsSection: React.FC<{ expenses: ExpenseWithDetails[]; currencyCode: string; sectionName: string }> = ({ expenses, currencyCode, sectionName }) => {
+const AnalyticsSection: React.FC<{ expenses: ExpenseWithDetails[]; currencyCode: string; sectionName: string; members: Member[] }> = ({ expenses, currencyCode, sectionName, members }) => {
     
   const totalSpent = useMemo(() => {
     return expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -25,6 +26,26 @@ const AnalyticsSection: React.FC<{ expenses: ExpenseWithDetails[]; currencyCode:
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
   }, [expenses]);
+
+  const memberSpending = useMemo(() => {
+    if (!members || members.length === 0) return [];
+    
+    const spendingMap = new Map<number, { member: Member; total: number }>();
+    members.forEach(member => {
+        spendingMap.set(member.id!, { member, total: 0 });
+    });
+
+    expenses.forEach(expense => {
+        expense.allocations.forEach(allocation => {
+            if (spendingMap.has(allocation.memberId)) {
+                const current = spendingMap.get(allocation.memberId)!;
+                current.total += allocation.amount;
+            }
+        });
+    });
+
+    return Array.from(spendingMap.values()).sort((a, b) => b.total - a.total);
+  }, [expenses, members]);
 
   if (expenses.length === 0) {
       return (
@@ -48,6 +69,23 @@ const AnalyticsSection: React.FC<{ expenses: ExpenseWithDetails[]; currencyCode:
               <h2 className="text-xl font-semibold mb-4">Spending by Category</h2>
               <CategoryChart data={spendingByCategory} currencyCode={currencyCode} />
           </Card>
+          
+          {memberSpending.length > 0 && (
+            <Card>
+                <h2 className="text-xl font-semibold mb-4">Spending by Member</h2>
+                <ul className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {memberSpending.map(({ member, total }) => (
+                        <li key={member.id} className="py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <Avatar name={member.name} />
+                                <span className="font-medium text-slate-800 dark:text-slate-100">{member.name}</span>
+                            </div>
+                            <span className="font-semibold text-slate-700 dark:text-slate-200">{formatCurrency(total, currencyCode)}</span>
+                        </li>
+                    ))}
+                </ul>
+            </Card>
+          )}
       </div>
   );
 };
@@ -58,6 +96,9 @@ const AnalyticsPage: React.FC = () => {
       groupExpenses,
       familyExpenses,
       individualExpenses,
+      groupTypeMembers,
+      familyMembers,
+      individualMembers,
       currencyCode, 
       loading 
   } = useData();
@@ -69,6 +110,12 @@ const AnalyticsPage: React.FC = () => {
       group: groupExpenses,
       family: familyExpenses,
       individual: individualExpenses,
+  };
+  
+  const membersByTab = {
+    group: groupTypeMembers,
+    family: familyMembers,
+    individual: individualMembers,
   };
   
   const sectionNameByTab = {
@@ -92,6 +139,7 @@ const AnalyticsPage: React.FC = () => {
 
       <AnalyticsSection 
         expenses={expensesByTab[activeTab]} 
+        members={membersByTab[activeTab]}
         currencyCode={currencyCode}
         sectionName={sectionNameByTab[activeTab]}
       />

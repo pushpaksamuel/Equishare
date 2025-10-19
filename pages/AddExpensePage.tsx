@@ -89,7 +89,7 @@ const AddExpensePage: React.FC = () => {
         }));
         await db.allocations.bulkAdd(allocationsToAdd);
       });
-      navigate('/expenses', { replace: true });
+      navigate('/expenses');
     } catch (error) {
       console.error('Failed to add expense:', error);
       alert('There was an error adding the expense.');

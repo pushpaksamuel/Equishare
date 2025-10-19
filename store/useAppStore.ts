@@ -25,7 +25,13 @@ export const useAppStore = create<AppState>((set) => ({
       return { theme: newTheme };
     });
   },
-  isLoggedIn: false,
-  login: () => set({ isLoggedIn: true }),
-  logout: () => set({ isLoggedIn: false }),
+  isLoggedIn: sessionStorage.getItem('isLoggedIn') === 'true',
+  login: () => {
+    sessionStorage.setItem('isLoggedIn', 'true');
+    set({ isLoggedIn: true });
+  },
+  logout: () => {
+    sessionStorage.removeItem('isLoggedIn');
+    set({ isLoggedIn: false });
+  },
 }));
