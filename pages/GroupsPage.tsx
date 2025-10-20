@@ -1,4 +1,6 @@
+
 import React, { useState, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useData } from '../hooks/useData';
 import { db } from '../db';
 import type { Group } from '../types';
@@ -12,6 +14,7 @@ import { PlusIcon, EditIcon, Trash2Icon, FolderIcon } from '../components/common
 
 const GroupsPage: React.FC = () => {
   const { allGroups, allMembers, allExpenses, loading } = useData();
+  const defaultCurrencySetting = useLiveQuery(() => db.settings.get('currency'));
   
   const [isModalOpen, setModalOpen] = useState(false);
   const [isDeleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -27,7 +30,8 @@ const GroupsPage: React.FC = () => {
   }, [allGroups, allMembers, allExpenses]);
 
   const openAddModal = () => {
-    setCurrentGroup({ name: '', currency: 'USD', type: 'group' });
+    const defaultCurrency = defaultCurrencySetting?.value || 'USD';
+    setCurrentGroup({ name: '', currency: defaultCurrency, type: 'group' });
     setModalOpen(true);
   };
 
