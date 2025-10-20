@@ -6,11 +6,12 @@ import { formatCurrency } from '../utils/formatters';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import CategoryChart from '../components/CategoryChart';
+import CurrencyConverterModal from '../components/CurrencyConverterModal';
 import type { ExpenseWithDetails, Member, User } from '../types';
 import { 
     PlusCircleIcon, DollarSignIcon, UsersIcon, TrendingUpIcon, 
     ReceiptIcon, ShoppingCartIcon, ZapIcon,
-    CameraIcon, Edit3Icon, RefreshCwIcon 
+    CameraIcon, Edit3Icon, ArrowLeftRightIcon 
 } from '../components/common/Icons';
 
 interface DashboardContentProps {
@@ -19,9 +20,11 @@ interface DashboardContentProps {
   members: Member[];
   user: User | undefined;
   currencyCode: string;
+  setConverterOpen: (open: boolean) => void;
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ title, expenses, members, user, currencyCode }) => {
+// FIX: Added `setConverterOpen` to props to handle opening the currency converter modal.
+const DashboardContent: React.FC<DashboardContentProps> = ({ title, expenses, members, user, currencyCode, setConverterOpen }) => {
     const recentExpenses = expenses.slice(0, 5);
   
     const analytics = useMemo(() => {
@@ -174,12 +177,12 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ title, expenses, me
                     <p className="font-semibold mt-3 text-sm">Manual Entry</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">Add expense details</p>
                 </Card>
-                <Card as={Link} to="#" className="text-center py-4 hover:border-slate-400 border-2 border-transparent transition-colors opacity-60 cursor-not-allowed">
+                <Card onClick={() => setConverterOpen(true)} className="text-center py-4 hover:border-primary-500 border-2 border-transparent transition-colors cursor-pointer">
                     <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-500/20 text-green-600 dark:text-green-400 mx-auto flex items-center justify-center">
-                        <RefreshCwIcon className="w-6 h-6" />
+                        <ArrowLeftRightIcon className="w-6 h-6" />
                     </div>
-                    <p className="font-semibold mt-3 text-sm">Recurring Bill</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Set up auto payments</p>
+                    <p className="font-semibold mt-3 text-sm">Currency Converter</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Quick exchange rates</p>
                 </Card>
                 <Card as={Link} to="#" className="text-center py-4 hover:border-slate-400 border-2 border-transparent transition-colors opacity-60 cursor-not-allowed">
                     <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 mx-auto flex items-center justify-center">
@@ -203,6 +206,7 @@ const DashboardPage: React.FC = () => {
     currencyCode, loading, allExpenses
   } = useData();
   const [activeTab, setActiveTab] = useState<'group' | 'family' | 'individual'>('group');
+  const [isConverterOpen, setConverterOpen] = useState(false);
 
   if (loading) return <div className="flex items-center justify-center h-full">Loading...</div>;
 
@@ -272,7 +276,9 @@ const DashboardPage: React.FC = () => {
         members={dataByTab[activeTab].members}
         user={user}
         currencyCode={currencyCode}
+        setConverterOpen={setConverterOpen}
       />
+      <CurrencyConverterModal isOpen={isConverterOpen} onClose={() => setConverterOpen(false)} />
     </div>
   );
 };
