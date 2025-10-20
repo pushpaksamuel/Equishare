@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import Modal from './common/Modal';
 import Input from './common/Input';
 import Select from './common/Select';
@@ -39,44 +39,31 @@ const CurrencyConverterModal: React.FC<CurrencyConverterModalProps> = ({ isOpen,
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const responseSchema = {
-        type: Type.OBJECT,
-        properties: {
-          rate: {
-            type: Type.NUMBER,
-            description: 'The exchange rate from the source currency to the target currency.',
-          },
-          convertedAmount: {
-            type: Type.NUMBER,
-            description: 'The final converted amount in the target currency.',
-          },
-          sourceCurrency: {
-            type: Type.STRING,
-            description: 'The three-letter code of the source currency (e.g., USD).',
-          },
-          targetCurrency: {
-            type: Type.STRING,
-            description: 'The three-letter code of the target currency (e.g., EUR).',
-          },
-        },
-        required: ['rate', 'convertedAmount', 'sourceCurrency', 'targetCurrency'],
-      };
+      
+      const prompt = `Using real-time financial data from Google Search, provide the currency conversion for ${amount} ${fromCurrency} to ${toCurrency}. Return *only* a valid JSON object with the following keys: "rate" (number), "convertedAmount" (number), "sourceCurrency" (string, 3-letter code), and "targetCurrency" (string, 3-letter code). Do not include any other text, explanations, or markdown formatting.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `What is the current exchange rate to convert ${amount} ${fromCurrency} to ${toCurrency}?`,
+        contents: prompt,
         config: {
-          responseMimeType: 'application/json',
-          responseSchema,
+          tools: [{googleSearch: {}}],
         },
       });
 
-      const jsonString = response.text.trim();
+      // The response from a grounded model might have markdown ```json ... ```, so we need to clean it.
+      let jsonString = response.text.trim();
+      if (jsonString.startsWith('```json')) {
+        jsonString = jsonString.substring(7);
+      }
+      if (jsonString.endsWith('```')) {
+        jsonString = jsonString.substring(0, jsonString.length - 3);
+      }
+      
       const parsedResult = JSON.parse(jsonString) as ConversionResult;
       setResult(parsedResult);
     } catch (e) {
       console.error('Currency conversion failed:', e);
-      setError('Failed to fetch conversion rate. Please try again.');
+      setError('Failed to fetch conversion rate. The format of the response may have been unexpected. Please try again.');
     } finally {
       setIsLoading(false);
     }
