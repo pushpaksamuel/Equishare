@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import type { Member } from '../types';
 
 export type AllocationInput = {
@@ -24,16 +24,19 @@ export function useExpenseSplit(
   const [splitMethod, setSplitMethod] = useState<'equally' | 'custom'>('equally');
   const [involvedMembers, setInvolvedMembers] = useState<Set<number>>(new Set());
   const [allocations, setAllocations] = useState<AllocationInput[]>([]);
-  const [isInitialRender, setIsInitialRender] = useState(true);
+  const prevAllMembersRef = useRef(allMembers);
 
   // Effect to initialize or reset the hook's state when props change (e.g., loading initial data on edit page)
   useEffect(() => {
     const isEditMode = initialAllocations.length > 0;
     
-    // 1. Determine the split method
-    const newSplitMethod = isEditMode && !areInitialAllocationsEqual(initialAllocations) ? 'custom' : 'equally';
-    setSplitMethod(newSplitMethod);
-
+    // FIX: Only reset the split method if the group members have changed or if it's an edit form.
+    // This prevents re-renders in "add" mode from wiping out the user's 'custom' selection.
+    if (prevAllMembersRef.current !== allMembers || isEditMode) {
+      const newSplitMethod = isEditMode && !areInitialAllocationsEqual(initialAllocations) ? 'custom' : 'equally';
+      setSplitMethod(newSplitMethod);
+    }
+    
     // 2. Determine involved members
     const involved = isEditMode
       ? initialAllocations.filter(a => a.amount > 0.005).map(a => a.memberId)
@@ -49,10 +52,10 @@ export function useExpenseSplit(
       };
     });
     setAllocations(newAllocations);
-    setIsInitialRender(false);
+    
+    prevAllMembersRef.current = allMembers;
 
   }, [initialAllocations, allMembers]);
-
 
   // Effect to recalculate equal split amounts when dependencies change
   useEffect(() => {
@@ -66,31 +69,6 @@ export function useExpenseSplit(
       );
     }
   }, [totalAmount, involvedMembers, splitMethod]);
-  
-  // FIX: Added a dedicated effect to pre-fill custom amounts when switching from 'equally'.
-  // This resolves the bug where selecting "Custom" wouldn't work as expected.
-  useEffect(() => {
-    // Prevent this from running on the initial render where state is still being set up.
-    if (isInitialRender) return;
-
-    if (splitMethod === 'custom') {
-      // Check if the current allocations are all zero, which suggests we just switched from 'equally'
-      // where the user hadn't entered any custom amounts yet.
-      const isPristineCustom = allocations.every(a => a.amount === 0);
-      
-      const amountPerPerson = involvedMembers.size > 0 ? totalAmount / involvedMembers.size : 0;
-      
-      // Only pre-fill if the total is > 0 and custom fields are empty, to avoid overwriting user input.
-      if (totalAmount > 0 && isPristineCustom) {
-        setAllocations(prev =>
-          prev.map(alloc => ({
-            ...alloc,
-            amount: involvedMembers.has(alloc.memberId) ? amountPerPerson : 0,
-          }))
-        );
-      }
-    }
-  }, [splitMethod, isInitialRender]);
 
 
   const toggleMemberInvolvement = (memberId: number) => {

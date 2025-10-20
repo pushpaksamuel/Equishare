@@ -19,16 +19,24 @@ import GroupsPage from './pages/GroupsPage';
 import SettingsPage from './pages/SettingsPage';
 
 function App() {
-  const { theme, setTheme, isLoggedIn } = useAppStore();
+  const { theme, setTheme, isLoggedIn, setDisplayCurrency } = useAppStore();
 
   const onboardedSetting = useLiveQuery(() => db.settings.get('onboarded'));
   const themeSetting = useLiveQuery(() => db.settings.get('theme'));
+  const currencySetting = useLiveQuery(() => db.settings.get('currency'));
 
   useEffect(() => {
     if (themeSetting?.value) {
       setTheme(themeSetting.value);
     }
   }, [themeSetting?.value, setTheme]);
+
+  useEffect(() => {
+    if (currencySetting?.value) {
+      setDisplayCurrency(currencySetting.value);
+    }
+  }, [currencySetting?.value, setDisplayCurrency]);
+
 
   useEffect(() => {
     if (theme === 'dark') {

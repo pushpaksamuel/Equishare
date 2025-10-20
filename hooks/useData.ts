@@ -1,37 +1,38 @@
-// FIX: Restored correct file content.
+// Restored file content.
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db';
 import { CURRENCIES } from '../constants';
 import type { Group, Member, Category, ExpenseWithDetails, Expense, Allocation, User } from '../types';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useAppStore } from '../store/useAppStore';
+import { getRate } from '../services/currencyService';
+
 
 export function useData() {
+  const { displayCurrency } = useAppStore();
   const user = useLiveQuery(() => db.users.toCollection().first(), []) as User | undefined;
   
-  // Fetch all core data
+  // Fetch all core data (original values)
   const allGroups = useLiveQuery(() => db.groups.toArray(), []) as Group[] | undefined;
   const allMembersQuery = useLiveQuery(() => db.members.toArray(), []) as Member[] | undefined;
   const categories = useLiveQuery(() => db.categories.toArray(), []) as Category[] | undefined;
-  const allExpenses = useLiveQuery(() => db.expenses.orderBy('date').reverse().toArray(), []) as Expense[] | undefined;
-  const allAllocations = useLiveQuery(
-    () => (allExpenses ? db.allocations.where('expenseId').anyOf(allExpenses.map(e => e.id!)).toArray() : []),
-    [allExpenses]
+  const allOriginalExpenses = useLiveQuery(() => db.expenses.orderBy('date').reverse().toArray(), []) as Expense[] | undefined;
+  const allOriginalAllocations = useLiveQuery(
+    () => (allOriginalExpenses ? db.allocations.where('expenseId').anyOf(allOriginalExpenses.map(e => e.id!)).toArray() : []),
+    [allOriginalExpenses]
   ) as Allocation[] | undefined;
   
-  // FIX: Memoize the `allMembers` array to ensure a stable reference is passed to child components,
-  // preventing unnecessary re-renders and state resets in hooks like `useExpenseSplit`.
   const allMembers = useMemo(() => allMembersQuery || [], [allMembersQuery]);
 
-
-  // Memoize detailed expense calculations
-  const allExpensesWithDetails: ExpenseWithDetails[] | undefined = useMemo(() => {
-    if (!allExpenses || !categories || !allMembers || !allAllocations) return undefined;
+  // Memoize detailed expense calculations with original values
+  const allExpensesWithDetails_Original: ExpenseWithDetails[] | undefined = useMemo(() => {
+    if (!allOriginalExpenses || !categories || !allMembers || !allOriginalAllocations) return undefined;
     
     const categoriesMap = new Map(categories.map(c => [c.id, c]));
     const membersMap = new Map(allMembers.map(m => [m.id, m]));
     
-    return allExpenses.map(expense => {
-      const expenseAllocations = allAllocations
+    return allOriginalExpenses.map(expense => {
+      const expenseAllocations = allOriginalAllocations
         .filter(a => a.expenseId === expense.id)
         .map(a => ({ ...a, member: membersMap.get(a.memberId)! }))
         .filter(a => a.member);
@@ -43,9 +44,68 @@ export function useData() {
         allocations: expenseAllocations,
       };
     }).filter(e => e.payer && e.category);
-  }, [allExpenses, categories, allMembers, allAllocations]);
+  }, [allOriginalExpenses, categories, allMembers, allOriginalAllocations]);
 
-  // Create categorized data
+  // State for converted expenses and loading status
+  const [processedExpenses, setProcessedExpenses] = useState<ExpenseWithDetails[]>([]);
+  const [isConverting, setIsConverting] = useState(false);
+
+  // Effect for currency conversion
+  useEffect(() => {
+    if (!allExpensesWithDetails_Original || !displayCurrency || !allGroups) {
+      setProcessedExpenses(allExpensesWithDetails_Original || []);
+      return;
+    }
+
+    const convertAllExpenses = async () => {
+      setIsConverting(true);
+      
+      const groupCurrencyMap = new Map(allGroups.map(g => [g.id!, g.currency]));
+      
+      const uniqueSourceCurrencies = [...new Set(allExpensesWithDetails_Original.map(exp => groupCurrencyMap.get(exp.groupId)).filter(Boolean))] as string[];
+
+      const ratePromises = uniqueSourceCurrencies.map(fromCurrency => getRate(fromCurrency, displayCurrency));
+      
+      try {
+        const rates = await Promise.all(ratePromises);
+        const rateMap = new Map<string, number>();
+        uniqueSourceCurrencies.forEach((currency, index) => {
+          rateMap.set(currency, rates[index]);
+        });
+
+        const newProcessedExpenses = allExpensesWithDetails_Original.map(expense => {
+          const fromCurrency = groupCurrencyMap.get(expense.groupId);
+          if (!fromCurrency) {
+            return expense; // Should not happen
+          }
+          const rate = rateMap.get(fromCurrency) || 1;
+          
+          if (Math.abs(rate - 1) < 0.0001) return expense; // No conversion needed
+
+          return {
+            ...expense,
+            amount: expense.amount * rate,
+            allocations: expense.allocations.map(alloc => ({
+              ...alloc,
+              amount: alloc.amount * rate,
+            })),
+          };
+        });
+        setProcessedExpenses(newProcessedExpenses);
+      } catch (error) {
+        console.error("Currency conversion failed during processing. Falling back to original values.", error);
+        setProcessedExpenses(allExpensesWithDetails_Original);
+      } finally {
+        setIsConverting(false);
+      }
+    };
+
+    convertAllExpenses();
+
+  }, [allExpensesWithDetails_Original, displayCurrency, allGroups]);
+
+
+  // Create categorized data based on processed (converted) expenses
   const { 
     individualGroups, familyGroups, groupGroups,
     individualMembers, familyMembers, groupMembers,
@@ -57,7 +117,7 @@ export function useData() {
       individualExpenses: [] as ExpenseWithDetails[], familyExpenses: [] as ExpenseWithDetails[], groupExpenses: [] as ExpenseWithDetails[],
     };
 
-    if (!allGroups || !allMembers || !allExpensesWithDetails) return result;
+    if (!allGroups || !allMembers || !processedExpenses) return result;
 
     result.individualGroups = allGroups.filter(g => g.type === 'individual');
     result.familyGroups = allGroups.filter(g => g.type === 'family');
@@ -71,45 +131,38 @@ export function useData() {
     result.familyMembers = allMembers.filter(m => familyGroupIds.has(m.groupId));
     result.groupMembers = allMembers.filter(m => groupGroupIds.has(m.groupId));
 
-    result.individualExpenses = allExpensesWithDetails.filter(e => individualGroupIds.has(e.groupId));
-    result.familyExpenses = allExpensesWithDetails.filter(e => familyGroupIds.has(e.groupId));
-    result.groupExpenses = allExpensesWithDetails.filter(e => groupGroupIds.has(e.groupId));
+    result.individualExpenses = processedExpenses.filter(e => individualGroupIds.has(e.groupId));
+    result.familyExpenses = processedExpenses.filter(e => familyGroupIds.has(e.groupId));
+    result.groupExpenses = processedExpenses.filter(e => groupGroupIds.has(e.groupId));
 
     return result;
-  }, [allGroups, allMembers, allExpensesWithDetails]);
+  }, [allGroups, allMembers, processedExpenses]);
 
 
-  // For backward compatibility with pages not yet updated (like Dashboard)
   const group = allGroups?.[0];
    const compatibilityGroupMembers = useMemo(() => {
     if (!group || !allMembers) return [];
     return allMembers.filter(m => m.groupId === group.id);
   }, [group, allMembers]);
 
-  const currencyCode = group?.currency || 'USD';
-  const currencySymbol = CURRENCIES.find(c => c.code === currencyCode)?.symbol || '$';
+  const currencySymbol = CURRENCIES.find(c => c.code === displayCurrency)?.symbol || '$';
 
-  const loading = user === undefined || allGroups === undefined || allMembersQuery === undefined || categories === undefined || allExpensesWithDetails === undefined;
+  const loading = user === undefined || allGroups === undefined || allMembersQuery === undefined || categories === undefined || allExpensesWithDetails_Original === undefined || isConverting;
 
   return { 
     user,
-    // Raw data
     allGroups: allGroups || [],
     allMembers: allMembers,
     categories: categories || [],
-    allExpenses: allExpensesWithDetails || [],
-    // Categorized Data
+    allExpenses: processedExpenses,
     individualGroups, familyGroups, groupGroups,
     individualMembers, familyMembers,
-    // FIX: Renamed `groupMembers` to `groupTypeMembers` to avoid conflict with the compatibility `groupMembers` property below.
     groupTypeMembers: groupMembers,
     individualExpenses, familyExpenses, groupExpenses,
-    // Compatibility data for Dashboard & old components
     group,
     groupMembers: compatibilityGroupMembers,
-    expenses: allExpensesWithDetails || [],
-    // currency
-    currencyCode,
+    expenses: processedExpenses,
+    currencyCode: displayCurrency,
     currencySymbol,
     loading 
   };

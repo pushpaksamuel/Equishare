@@ -1,7 +1,6 @@
-// FIX: Restored correct file content.
+// Restored file content.
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useAppStore } from '../store/useAppStore';
 import { exportData, importData } from '../services/backupService';
 import { resizeAndEncodeImage } from '../services/imageService';
@@ -16,7 +15,7 @@ import Avatar from '../components/common/Avatar';
 import { LogOutIcon } from '../components/common/Icons';
 
 const SettingsPage: React.FC = () => {
-  const { theme, toggleTheme, logout } = useAppStore();
+  const { theme, toggleTheme, logout, displayCurrency, setDisplayCurrency } = useAppStore();
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const { user, loading } = useData();
@@ -28,15 +27,6 @@ const SettingsPage: React.FC = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  const currencySetting = useLiveQuery(() => db.settings.get('currency'));
-  const [defaultCurrency, setDefaultCurrency] = useState('USD');
-  
-  useEffect(() => {
-    if (currencySetting?.value) {
-        setDefaultCurrency(currencySetting.value);
-    }
-  }, [currencySetting]);
 
   useEffect(() => {
     if (user) {
@@ -58,10 +48,8 @@ const SettingsPage: React.FC = () => {
     }
   }, [user]);
 
-  const handleCurrencyChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCurrency = event.target.value;
-    setDefaultCurrency(newCurrency);
-    await db.settings.put({ id: 'currency', value: newCurrency });
+  const handleCurrencyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setDisplayCurrency(event.target.value);
   };
 
   const handleImportClick = () => {
@@ -207,18 +195,18 @@ const SettingsPage: React.FC = () => {
       </section>
 
       <section>
-        <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Default Currency</h2>
+        <h2 className="text-xl font-semibold mb-4 text-slate-800 dark:text-slate-100">Display Currency</h2>
         <Card>
           <div className="flex flex-wrap justify-between items-center gap-4">
             <div>
-              <h3 className="font-medium">New Group Currency</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Set the default currency for any new groups you create.</p>
+              <h3 className="font-medium">App-Wide Currency</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Select the currency to display all monetary values in.</p>
             </div>
             <Select
-              value={defaultCurrency}
+              value={displayCurrency}
               onChange={handleCurrencyChange}
               className="w-full sm:w-auto"
-              aria-label="Default currency"
+              aria-label="Display currency"
             >
               {CURRENCIES.map(c => (
                 <option key={c.code} value={c.code}>{c.name} ({c.symbol})</option>

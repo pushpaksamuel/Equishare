@@ -71,6 +71,7 @@ const AddExpensePage: React.FC = () => {
     }
     
     setIsSaving(true);
+    let success = false;
     try {
       await db.transaction('rw', db.expenses, db.allocations, async () => {
         const expenseId = await db.expenses.add({
@@ -89,12 +90,16 @@ const AddExpensePage: React.FC = () => {
         }));
         await db.allocations.bulkAdd(allocationsToAdd);
       });
-      navigate('/expenses');
+      success = true;
     } catch (error) {
+      success = false;
       console.error('Failed to add expense:', error);
       alert('There was an error adding the expense.');
     } finally {
       setIsSaving(false);
+      if (success) {
+        navigate('/dashboard');
+      }
     }
   };
 
@@ -223,7 +228,7 @@ const AddExpensePage: React.FC = () => {
         </Card>
         
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4">
-          <Button type="button" variant="secondary" onClick={() => navigate('/expenses')}>Cancel</Button>
+          <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
           <Button type="submit" disabled={!isValid || isSaving}>
             {isSaving ? 'Saving...' : 'Save Expense'}
           </Button>

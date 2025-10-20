@@ -10,6 +10,8 @@ interface AppState {
   isLoggedIn: boolean;
   login: () => void;
   logout: () => void;
+  displayCurrency: string;
+  setDisplayCurrency: (currency: string) => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -33,5 +35,11 @@ export const useAppStore = create<AppState>((set) => ({
   logout: () => {
     sessionStorage.removeItem('isLoggedIn');
     set({ isLoggedIn: false });
+  },
+  displayCurrency: 'USD', // Default fallback
+  setDisplayCurrency: (currency) => {
+    set({ displayCurrency: currency });
+    // Also update the setting in the database for persistence
+    db.settings.put({ id: 'currency', value: currency });
   },
 }));
