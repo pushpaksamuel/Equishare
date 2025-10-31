@@ -42,8 +42,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the built output folder, not the source code
-          path: './dist'
+          path: './dist'   # ✅ Upload only the built folder
 
       - name: Deploy to GitHub Pages
         id: deployment
