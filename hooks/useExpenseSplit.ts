@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Member } from '../types';
 
 export type AllocationInput = {
@@ -24,26 +24,28 @@ export function useExpenseSplit(
   const [splitMethod, setSplitMethod] = useState<'equally' | 'custom'>('equally');
   const [involvedMembers, setInvolvedMembers] = useState<Set<number>>(new Set());
   const [allocations, setAllocations] = useState<AllocationInput[]>([]);
-  const prevAllMembersRef = useRef(allMembers);
+  
+  // Create a stable key based on the members' IDs. This prevents the effect from
+  // re-running unnecessarily due to parent component re-renders creating a new
+  // `allMembers` array reference with the same content.
+  const memberKey = useMemo(() => allMembers.map(m => m.id).sort().join(','), [allMembers]);
 
-  // Effect to initialize or reset the hook's state when props change (e.g., loading initial data on edit page)
+  // This effect handles the initialization and reset logic. It now correctly
+  // depends on the stable `memberKey` to avoid infinite loops.
   useEffect(() => {
     const isEditMode = initialAllocations.length > 0;
-    
-    // FIX: Only reset the split method if the group members have changed or if it's an edit form.
-    // This prevents re-renders in "add" mode from wiping out the user's 'custom' selection.
-    if (prevAllMembersRef.current !== allMembers || isEditMode) {
-      const newSplitMethod = isEditMode && !areInitialAllocationsEqual(initialAllocations) ? 'custom' : 'equally';
-      setSplitMethod(newSplitMethod);
-    }
-    
-    // 2. Determine involved members
+
+    // Determine the split method based on initial data (for edit mode)
+    const newSplitMethod = isEditMode && !areInitialAllocationsEqual(initialAllocations) ? 'custom' : 'equally';
+    setSplitMethod(newSplitMethod);
+
+    // Determine which members are involved in the split
     const involved = isEditMode
       ? initialAllocations.filter(a => a.amount > 0.005).map(a => a.memberId)
       : allMembers.map(m => m.id!);
     setInvolvedMembers(new Set(involved));
 
-    // 3. Initialize allocation amounts
+    // Initialize the allocation amounts for each member
     const newAllocations = allMembers.map(member => {
       const existing = isEditMode ? initialAllocations.find(a => a.memberId === member.id) : undefined;
       return {
@@ -52,10 +54,8 @@ export function useExpenseSplit(
       };
     });
     setAllocations(newAllocations);
-    
-    prevAllMembersRef.current = allMembers;
-
-  }, [initialAllocations, allMembers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberKey, initialAllocations]);
 
   // Effect to recalculate equal split amounts when dependencies change
   useEffect(() => {

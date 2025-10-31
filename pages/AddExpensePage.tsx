@@ -1,5 +1,5 @@
 // FIX: Restored correct file content.
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../db';
 import { useData } from '../hooks/useData';
@@ -28,6 +28,13 @@ const AddExpensePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    // Pre-select the first available group to improve user experience
+    if (!selectedGroupId && allGroups.length > 0) {
+        setSelectedGroupId(allGroups[0].id!);
+    }
+  }, [allGroups, selectedGroupId]);
+
   const selectedGroup = useMemo(() => allGroups.find(g => g.id === selectedGroupId), [allGroups, selectedGroupId]);
   const membersOfSelectedGroup = useMemo(() => allMembers.filter(m => m.groupId === selectedGroupId), [allMembers, selectedGroupId]);
   const currencySymbol = useMemo(() => {
@@ -36,6 +43,8 @@ const AddExpensePage: React.FC = () => {
   }, [selectedGroup]);
 
   const totalAmount = parseFloat(amount) || 0;
+  // FIX: Provide a stable empty array reference for initialAllocations to prevent infinite loops in useExpenseSplit.
+  const initialAllocations = useMemo(() => [], []);
   const {
     splitMethod,
     setSplitMethod,
@@ -46,7 +55,7 @@ const AddExpensePage: React.FC = () => {
     remainingAmount,
     isValid,
     finalAllocations
-  } = useExpenseSplit(totalAmount, membersOfSelectedGroup);
+  } = useExpenseSplit(totalAmount, membersOfSelectedGroup, initialAllocations);
   
   const sortedCategories = useMemo(() => [...categories].sort((a,b) => a.name.localeCompare(b.name)), [categories]);
   
@@ -63,45 +72,49 @@ const AddExpensePage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedGroup || !isValid || !payerId || !categoryId || !description.trim()) {
-      alert('Please fill out all required fields and ensure the split is correct.');
-      return;
-    }
-    
-    setIsSaving(true);
-    let success = false;
-    try {
-      await db.transaction('rw', db.expenses, db.allocations, async () => {
-        const expenseId = await db.expenses.add({
-          groupId: selectedGroup.id!,
-          description,
-          amount: totalAmount,
-          date: new Date(date),
-          categoryId: Number(categoryId),
-          payerMemberId: Number(payerId),
-          receiptImage,
-        });
+ const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
 
-        const allocationsToAdd = finalAllocations.map(alloc => ({
-          ...alloc,
-          expenseId,
-        }));
-        await db.allocations.bulkAdd(allocationsToAdd);
+  if (!selectedGroup || !isValid || !payerId || !categoryId || !description.trim()) {
+    alert('Please fill out all required fields and ensure the split is correct.');
+    return;
+  }
+
+  setIsSaving(true);
+  let success = false;
+
+  try {
+    await db.transaction('rw', db.expenses, db.allocations, async () => {
+      const expenseId = await db.expenses.add({
+        groupId: selectedGroup.id!,
+        description,
+        amount: totalAmount,
+        date: new Date(date),
+        categoryId: Number(categoryId),
+        payerMemberId: Number(payerId),
+        receiptImage,
       });
-      success = true;
-    } catch (error) {
-      success = false;
-      console.error('Failed to add expense:', error);
-      alert('There was an error adding the expense.');
-    } finally {
-      setIsSaving(false);
-      if (success) {
-        navigate('/dashboard');
-      }
+
+      const allocationsToAdd = finalAllocations.map(alloc => ({
+        ...alloc,
+        expenseId,
+      }));
+      await db.allocations.bulkAdd(allocationsToAdd);
+    });
+
+    success = true;
+  } catch (error) {
+    console.error('Failed to add expense:', error);
+    alert('There was an error adding the expense.');
+  } finally {
+    setIsSaving(false);
+    if (success) {
+      // ✅ Redirect after successful save
+      navigate('/expenses', { replace: true });
     }
-  };
+  }
+};
+
 
   if (loading) return <div>Loading...</div>;
   if (allGroups.length === 0) return <div>No groups found. Please create a group first in Settings.</div>;
@@ -228,9 +241,15 @@ const AddExpensePage: React.FC = () => {
         </Card>
         
         <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4">
-          <Button type="button" variant="secondary" onClick={() => navigate(-1)}>Cancel</Button>
+          <Button 
+            type="button" 
+            variant="secondary" 
+            onClick={() => navigate('/expenses', { replace: true })} 
+          >
+            Cancel
+          </Button>
           <Button type="submit" disabled={!isValid || isSaving}>
-            {isSaving ? 'Saving...' : 'Save Expense'}
+              {isSaving ? 'Saving...' : 'Save Expense'}
           </Button>
         </div>
       </form>
